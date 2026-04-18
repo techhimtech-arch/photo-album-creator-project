@@ -127,7 +127,7 @@ export default function StepDesign() {
       {/* Template picker */}
       <div className="space-y-3">
         <Label>Template</Label>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {TEMPLATES.map((t) => (
             <div key={t.key} className="space-y-2">
               <TemplateThumb
@@ -144,6 +144,8 @@ export default function StepDesign() {
           ))}
         </div>
       </div>
+
+      {design.template === "custom" && <CustomEditor />}
 
       <div className="grid md:grid-cols-2 gap-5">
         <div className="space-y-2">
