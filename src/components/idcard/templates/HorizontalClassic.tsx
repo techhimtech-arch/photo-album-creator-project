@@ -8,7 +8,7 @@ export default function HorizontalClassic({ student, photo, mapping, design }: C
   return (
     <div
       className="relative bg-white rounded-md overflow-hidden border shadow-sm"
-      style={{ width: 344, height: 216, color: "#111" }}
+      style={{ width: design.customWidth * 4, height: design.customHeight * 4, color: "#111" }}
     >
       {/* header */}
       <div

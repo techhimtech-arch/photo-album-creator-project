@@ -8,7 +8,7 @@ export default function VerticalModern({ student, photo, mapping, design }: Card
   return (
     <div
       className="relative bg-white rounded-md overflow-hidden border shadow-sm flex flex-col"
-      style={{ width: 216, height: 344, color: "#111" }}
+      style={{ width: design.customWidth * 4, height: design.customHeight * 4, color: "#111" }}
     >
       <div
         className="px-3 py-3 text-white text-center"

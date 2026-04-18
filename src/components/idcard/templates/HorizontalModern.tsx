@@ -8,7 +8,7 @@ export default function HorizontalModern({ student, photo, mapping, design }: Ca
   return (
     <div
       className="relative bg-white rounded-md overflow-hidden border shadow-sm flex"
-      style={{ width: 344, height: 216, color: "#111" }}
+      style={{ width: design.customWidth * 4, height: design.customHeight * 4, color: "#111" }}
     >
       {/* sidebar */}
       <div
