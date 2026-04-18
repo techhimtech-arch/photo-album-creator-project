@@ -7,12 +7,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, ArrowRight, Upload, X } from "lucide-react";
 import { FIELD_LABELS, type CardTemplate, type FieldKey } from "@/types/idcard";
 import { cn } from "@/lib/utils";
+import CustomEditor from "./CustomEditor";
 
 const TEMPLATES: { key: CardTemplate; label: string; desc: string }[] = [
   { key: "vertical-classic", label: "Vertical · Classic", desc: "Photo top, accent corner, footer band" },
   { key: "horizontal-classic", label: "Horizontal · Classic", desc: "Header band, fields + photo, stripes" },
   { key: "vertical-modern", label: "Vertical · Modern", desc: "Solid header, clean rules" },
   { key: "horizontal-modern", label: "Horizontal · Modern", desc: "Accent sidebar, minimalist body" },
+  { key: "custom", label: "Custom · Your design", desc: "Upload background, drag fields freely" },
 ];
 
 function TemplateThumb({ tpl, active, accent, onClick }: { tpl: CardTemplate; active: boolean; accent: string; onClick: () => void }) {
@@ -77,6 +79,16 @@ function TemplateThumb({ tpl, active, accent, onClick }: { tpl: CardTemplate; ac
             <rect x="48" y="28" width="32" height="1.5" fill="#ccc" />
           </>
         )}
+        {tpl === "custom" && (
+          <>
+            <rect x="3" y="3" width={w - 6} height={h - 6} fill="#f5f5f5" stroke={accent} strokeDasharray="2 2" />
+            <rect x="8" y="10" width="14" height="18" fill={accent} opacity="0.3" />
+            <rect x="26" y="12" width="20" height="2" fill={accent} />
+            <rect x="26" y="18" width="16" height="1.5" fill="#999" />
+            <rect x="26" y="22" width="18" height="1.5" fill="#999" />
+            <text x={w / 2} y={h - 6} textAnchor="middle" fontSize="6" fill={accent} fontWeight="bold">CUSTOM</text>
+          </>
+        )}
       </svg>
     </button>
   );
@@ -115,7 +127,7 @@ export default function StepDesign() {
       {/* Template picker */}
       <div className="space-y-3">
         <Label>Template</Label>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {TEMPLATES.map((t) => (
             <div key={t.key} className="space-y-2">
               <TemplateThumb
@@ -132,6 +144,8 @@ export default function StepDesign() {
           ))}
         </div>
       </div>
+
+      {design.template === "custom" && <CustomEditor />}
 
       <div className="grid md:grid-cols-2 gap-5">
         <div className="space-y-2">

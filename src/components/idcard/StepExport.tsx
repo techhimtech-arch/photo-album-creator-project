@@ -13,8 +13,13 @@ export default function StepExport() {
   const [cutGuides, setCutGuides] = useState(true);
 
   const photoMap = useMemo(() => Object.fromEntries(photos.map((p) => [p.id, p])), [photos]);
+  const isCustom = design.template === "custom";
   const isVertical = design.orientation === "portrait";
-  const dims = isVertical ? CARD_DIMS.vertical : CARD_DIMS.horizontal;
+  const dims = isCustom
+    ? { w: design.customWidth, h: design.customHeight }
+    : isVertical
+    ? CARD_DIMS.vertical
+    : CARD_DIMS.horizontal;
 
   const generatePdf = async () => {
     setBusy(true);
@@ -24,8 +29,8 @@ export default function StepExport() {
       const pageH = 297;
       const cardW = dims.w;
       const cardH = dims.h;
-      const cols = isVertical ? 3 : 2;
-      const rows = isVertical ? 3 : 5;
+      const cols = Math.max(1, Math.floor((pageW - 8) / (cardW + 4)));
+      const rows = Math.max(1, Math.floor((pageH - 8) / (cardH + 4)));
       const gapX = (pageW - cols * cardW) / (cols + 1);
       const gapY = (pageH - rows * cardH) / (rows + 1);
       const perPage = cols * rows;
@@ -50,14 +55,18 @@ export default function StepExport() {
     }
   };
 
-  const sample = students.slice(0, isVertical ? 6 : 4);
+  const perPagePreview = Math.max(
+    1,
+    Math.floor((210 - 8) / (dims.w + 4)) * Math.floor((297 - 8) / (dims.h + 4)),
+  );
+  const sample = students.slice(0, Math.min(6, students.length));
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Preview & download</h2>
         <p className="text-muted-foreground mt-1">
-          {students.length} cards · {isVertical ? "9" : "10"} per A4 page · {isVertical ? "Portrait" : "Landscape"} layout.
+          {students.length} cards · {dims.w}×{dims.h}mm · ~{perPagePreview} per A4 page.
         </p>
       </div>
 
