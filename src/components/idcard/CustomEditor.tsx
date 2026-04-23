@@ -126,8 +126,8 @@ export default function CustomEditor() {
       count++;
     }
 
-    if (hasPhoto || mapping.name) {
-      // Photo box (only if photos exist in mapping at all)
+    if (hasPhoto) {
+      // Photo box on top-right
       addElement({
         kind: "photo",
         x: Math.max(0, cw - photoW - 4),
