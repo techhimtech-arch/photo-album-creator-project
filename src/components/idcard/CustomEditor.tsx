@@ -37,6 +37,14 @@ export default function CustomEditor() {
         elStartH: number;
       }
   >(null);
+  const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
+
+  /** Snap threshold in mm. */
+  const SNAP_MM = 1.2;
+  /** Grid step in mm. */
+  const GRID_MM = 2;
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
