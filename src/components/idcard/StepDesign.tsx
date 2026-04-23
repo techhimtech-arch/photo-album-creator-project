@@ -4,10 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, ArrowRight, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Upload, X, Wand2 } from "lucide-react";
 import { FIELD_LABELS, type CardTemplate, type FieldKey } from "@/types/idcard";
 import { cn } from "@/lib/utils";
 import CustomEditor from "./CustomEditor";
+import { templateToCustomElements } from "@/lib/template-to-custom";
+import { toast } from "sonner";
 
 const TEMPLATES: { key: CardTemplate; label: string; desc: string }[] = [
   { key: "vertical-classic", label: "Vertical · Classic", desc: "Photo top, accent corner, footer band" },
@@ -116,6 +118,16 @@ export default function StepDesign() {
   const mappedFields = (Object.keys(FIELD_LABELS) as FieldKey[]).filter(
     (f) => f !== "name" && Boolean(mapping[f]),
   );
+
+  const convertToEditable = () => {
+    const elements = templateToCustomElements(design);
+    setDesign({
+      template: "custom",
+      customElements: elements,
+      customBgDataUrl: null,
+    });
+    toast.success("Template converted to editable layout. Drag any element to customize.");
+  };
 
   return (
     <div className="space-y-8 max-w-3xl">
