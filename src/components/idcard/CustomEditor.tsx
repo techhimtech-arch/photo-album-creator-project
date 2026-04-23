@@ -318,6 +318,18 @@ export default function CustomEditor() {
         <Button size="sm" variant="outline" onClick={() => addElement({ kind: "signature", w: 24, h: 8 })}>
           <ImageIcon className="h-3.5 w-3.5" /> Signature
         </Button>
+        <Button size="sm" variant="outline" onClick={() => addElement({ kind: "line", w: 30, h: 0.6 })} title="Horizontal/vertical line">
+          <Minus className="h-3.5 w-3.5" /> Line
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => addElement({ kind: "rect", w: 30, h: 12 })} title="Rectangle / box">
+          <Square className="h-3.5 w-3.5" /> Box
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => addElement({ kind: "divider", text: "INFO", w: 40, h: 4 })} title="Line with label in middle">
+          <SeparatorHorizontal className="h-3.5 w-3.5" /> Divider
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => addElement({ kind: "qr", w: 14, h: 14 })} title="QR code">
+          <QrCode className="h-3.5 w-3.5" /> QR
+        </Button>
         <div className="ml-auto flex gap-1.5">
           <Button
             size="sm"
