@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import type { CardDesign, ColumnMapping, PhotoFile, Student, CustomElement, FieldKey } from "@/types/idcard";
 import { FIELD_LABELS } from "@/types/idcard";
 import { formatDate } from "@/lib/format-date";
+import { computeFieldsLayout } from "@/lib/auto-fit";
 
 const DATE_FIELDS = new Set<FieldKey>(["dob"]);
 
@@ -254,34 +255,50 @@ function drawVerticalClassic({ doc, x, y, student, photo, mapping, design }: Dra
   doc.setFontSize(9);
   safeText(doc, name, x + W / 2, py + ph + 4.5, W - 4, { align: "center", maxLines: 1 });
 
-  // Fields
-  let fy = py + ph + 8.5;
+  // Fields — auto-fit
   const fields = design.visibleFields.filter((f) => f !== "name" && f !== "address");
-  doc.setFontSize(6.2);
+  const addr = getValue(student, mapping, "address", design);
+  const addressIncluded = !!addr && design.visibleFields.includes("address");
   const footerH = 6;
+  const sigReserve = (design.signatureDataUrl || design.principalName) ? 11 : 2;
+  const fieldsTop = py + ph + 7;
+  const fieldsBottom = y + H - footerH - sigReserve;
+  const available = Math.max(4, fieldsBottom - fieldsTop);
+  const layout = computeFieldsLayout({
+    fieldsCount: fields.length + (addressIncluded ? 1 : 0),
+    availableHeight: available,
+    addressIncluded,
+    unit: "mm",
+  });
+
+  let fy = fieldsTop + layout.fontSize * 0.6;
+  doc.setFontSize(layout.fontSize);
   for (const f of fields) {
     const v = getValue(student, mapping, f, design);
     if (!v) continue;
-    if (fy > y + H - footerH - 4) break;
     doc.setTextColor(120);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(layout.labelSize);
     doc.text(FIELD_LABELS[f], x + 3, fy);
     doc.setTextColor(25);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(layout.fontSize);
     doc.text(String(v), x + W - 3, fy, { align: "right", maxWidth: W - 22 });
-    fy += 3.4;
+    fy += layout.rowHeight;
   }
 
   // Address
-  const addr = getValue(student, mapping, "address", design);
-  if (addr && design.visibleFields.includes("address") && fy < y + H - footerH - 5) {
+  if (addressIncluded && fy < fieldsBottom) {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120);
-    doc.setFontSize(5.5);
+    doc.setFontSize(layout.labelSize);
     doc.text("Address", x + 3, fy);
     doc.setTextColor(40);
-    doc.setFontSize(5.8);
-    safeText(doc, addr, x + 3, fy + 2.4, W - 6, { lineHeight: 2.4, maxLines: 2 });
+    doc.setFontSize(layout.fontSize);
+    safeText(doc, addr, x + 3, fy + layout.labelSize * 0.45, W - 6, {
+      lineHeight: layout.fontSize * 0.42,
+      maxLines: layout.maxAddressLines,
+    });
   }
 
   // Signature row above footer
@@ -384,25 +401,34 @@ function drawHorizontalClassic({ doc, x, y, student, photo, mapping, design }: D
   doc.setLineWidth(0.3);
   doc.line(fx, fy - 1, fx + 18, fy - 1);
 
-  doc.setFontSize(6.2);
   const fields = design.visibleFields.filter((f) => f !== "name");
+  const addressIncluded = fields.includes("address");
   const labelW = 18;
+  const available = Math.max(4, (y + H - 5) - fy);
+  const layout = computeFieldsLayout({
+    fieldsCount: fields.length,
+    availableHeight: available,
+    addressIncluded,
+    unit: "mm",
+  });
   for (const f of fields) {
     const v = getValue(student, mapping, f, design);
     if (!v) continue;
-    if (fy > y + H - 7) break;
     doc.setTextColor(110);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(layout.labelSize);
     doc.text(FIELD_LABELS[f], fx, fy);
     doc.setTextColor(35);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(layout.fontSize);
     doc.text(":", fx + labelW - 1, fy);
     const lines = doc.splitTextToSize(String(v), fmaxW - labelW) as string[];
-    const max = f === "address" ? 2 : 1;
+    const max = f === "address" ? layout.maxAddressLines : 1;
     const shown = lines.slice(0, max);
     if (lines.length > max) shown[shown.length - 1] = shown[shown.length - 1].replace(/.{1,3}$/, "…");
-    shown.forEach((ln, i) => doc.text(ln, fx + labelW + 1, fy + i * 2.8));
-    fy += 2.8 * shown.length + 0.8;
+    const lh = layout.fontSize * 0.45;
+    shown.forEach((ln, i) => doc.text(ln, fx + labelW + 1, fy + i * lh));
+    fy += lh * shown.length + layout.gap;
   }
 }
 
@@ -448,29 +474,39 @@ function drawVerticalModern({ doc, x, y, student, photo, mapping, design }: Draw
   doc.setFontSize(9.5);
   safeText(doc, name, x + W / 2, py + ph + 5, W - 6, { align: "center", maxLines: 1 });
 
-  // Fields with thin rules
+  // Fields with thin rules — auto-fit
   let fy = py + ph + 9;
   const fields = design.visibleFields.filter((f) => f !== "name");
-  doc.setFontSize(6);
+  const addressIncluded = fields.includes("address");
+  const sigReserve = (design.signatureDataUrl || design.principalName) ? 11 : 3;
+  const available = Math.max(4, (y + H - sigReserve) - fy);
+  const layout = computeFieldsLayout({
+    fieldsCount: fields.length,
+    availableHeight: available,
+    addressIncluded,
+    unit: "mm",
+  });
   for (const f of fields) {
     const v = getValue(student, mapping, f, design);
     if (!v) continue;
-    if (fy > y + H - 6) break;
     doc.setTextColor(140);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(layout.labelSize);
     doc.text(FIELD_LABELS[f].toUpperCase(), x + 3, fy);
     doc.setTextColor(30);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(layout.fontSize);
     const lines = doc.splitTextToSize(String(v), 28) as string[];
-    const max = f === "address" ? 2 : 1;
+    const max = f === "address" ? layout.maxAddressLines : 1;
     const shown = lines.slice(0, max);
     if (lines.length > max) shown[shown.length - 1] = shown[shown.length - 1].replace(/.{1,3}$/, "…");
-    shown.forEach((ln, i) => doc.text(ln, x + W - 3, fy + i * 2.6, { align: "right" }));
-    fy += 2.6 * shown.length + 0.6;
+    const lh = layout.fontSize * 0.42;
+    shown.forEach((ln, i) => doc.text(ln, x + W - 3, fy + i * lh, { align: "right" }));
+    fy += lh * shown.length + layout.gap * 0.5;
     doc.setDrawColor(235);
     doc.setLineWidth(0.1);
-    doc.line(x + 3, fy - 0.5, x + W - 3, fy - 0.5);
-    fy += 1;
+    doc.line(x + 3, fy - 0.3, x + W - 3, fy - 0.3);
+    fy += layout.gap * 0.6;
   }
 
   // Signature near bottom-right
@@ -539,25 +575,35 @@ function drawHorizontalModern({ doc, x, y, student, photo, mapping, design }: Dr
   doc.setTextColor(rgb[0], rgb[1], rgb[2]);
   doc.text("STUDENT", fx, py + 6.5);
 
-  // Fields
+  // Fields — auto-fit
   let fy = py + 10.5;
-  doc.setFontSize(6);
   const fields = design.visibleFields.filter((f) => f !== "name");
+  const addressIncluded = fields.includes("address");
+  const sigReserve = (design.signatureDataUrl || design.principalName) ? 10 : 3;
+  const available = Math.max(4, (y + H - sigReserve) - fy);
+  const layout = computeFieldsLayout({
+    fieldsCount: fields.length,
+    availableHeight: available,
+    addressIncluded,
+    unit: "mm",
+  });
   for (const f of fields) {
     const v = getValue(student, mapping, f, design);
     if (!v) continue;
-    if (fy > y + H - 4) break;
     doc.setTextColor(120);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(layout.labelSize);
     doc.text(FIELD_LABELS[f], fx, fy);
     doc.setTextColor(30);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(layout.fontSize);
     const lines = doc.splitTextToSize(String(v), fmaxW) as string[];
-    const max = f === "address" ? 2 : 1;
+    const max = f === "address" ? layout.maxAddressLines : 1;
     const shown = lines.slice(0, max);
     if (lines.length > max) shown[shown.length - 1] = shown[shown.length - 1].replace(/.{1,3}$/, "…");
-    shown.forEach((ln, i) => doc.text(ln, x + W - 3, fy + i * 2.6, { align: "right" }));
-    fy += 2.6 * shown.length + 1.2;
+    const lh = layout.fontSize * 0.42;
+    shown.forEach((ln, i) => doc.text(ln, x + W - 3, fy + i * lh, { align: "right" }));
+    fy += lh * shown.length + layout.gap;
   }
 
   // Bottom hairline
