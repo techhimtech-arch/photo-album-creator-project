@@ -760,15 +760,15 @@ export function withRotatedCard(
   const nx = cx - h / 2;
   const ny = cy - w / 2;
   const d = doc as unknown as {
-    saveGraphicsState: () => void;
-    restoreGraphicsState: () => void;
-    setCurrentTransformationMatrix: (m: unknown) => void;
+    advancedAPI: (fn: (doc: jsPDF) => void) => void;
     Matrix: new (a: number, b: number, c: number, d: number, e: number, f: number) => unknown;
+    setCurrentTransformationMatrix: (m: unknown) => void;
   };
-  d.saveGraphicsState();
-  // 90° rotation around (cx,cy): cos=0, sin=1
-  // matrix = translate(cx,cy) * rotate(90) * translate(-cx,-cy) → [0, 1, -1, 0, cx+cy, cy-cx]
-  d.setCurrentTransformationMatrix(new d.Matrix(0, 1, -1, 0, cx + cy, cy - cx));
-  draw(nx, ny, h, w);
-  d.restoreGraphicsState();
+
+  d.advancedAPI(() => {
+    d.setCurrentTransformationMatrix(new d.Matrix(1, 0, 0, 1, cx, cy));
+    d.setCurrentTransformationMatrix(new d.Matrix(0, 1, -1, 0, 0, 0));
+    d.setCurrentTransformationMatrix(new d.Matrix(1, 0, 0, 1, -cx, -cy));
+    draw(nx, ny, h, w);
+  });
 }
