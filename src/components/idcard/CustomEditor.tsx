@@ -567,8 +567,8 @@ export default function CustomEditor() {
         <div className="bg-muted/40 rounded-lg p-6 border overflow-auto flex items-start justify-center">
           <div
             ref={canvasRef}
-            onMouseDown={() => setSelectedId(null)}
-            className="relative bg-white shadow-md select-none"
+            onMouseDown={onCanvasMouseDown}
+            className={cn("relative bg-white shadow-md select-none", eraseMode && "cursor-crosshair")}
             style={{
               width: W,
               height: H,
@@ -581,6 +581,20 @@ export default function CustomEditor() {
               backgroundPosition: "center",
             }}
           >
+            {eraseDraw && (
+              <div
+                className="absolute pointer-events-none border-2 border-destructive bg-destructive/20"
+                style={{
+                  left: eraseDraw.x * PX_PER_MM,
+                  top: eraseDraw.y * PX_PER_MM,
+                  width: eraseDraw.w * PX_PER_MM,
+                  height: eraseDraw.h * PX_PER_MM,
+                }}
+              />
+            )}
+            {eraseMode && (
+              <div className="absolute inset-0 z-10" />
+            )}
             {guides.v.map((x, i) => (
               <div
                 key={`gv-${i}`}
