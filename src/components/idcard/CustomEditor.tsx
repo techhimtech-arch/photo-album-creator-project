@@ -13,9 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Image as ImageIcon, Type, User, Plus, AlignLeft, AlignCenter, AlignRight, Bold, Italic, X, Minus, Square, QrCode, SeparatorHorizontal } from "lucide-react";
+import { Trash2, Image as ImageIcon, Type, User, Plus, AlignLeft, AlignCenter, AlignRight, Bold, Italic, X, Minus, Square, QrCode, SeparatorHorizontal, Eraser, Wand2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DATE_FORMAT_OPTIONS, formatDate } from "@/lib/format-date";
+import { eraseRectsFromImage } from "@/lib/bg-eraser";
+import { toast } from "sonner";
 
 /** On-screen scale for the editor — larger than preview so dragging is precise. */
 const PX_PER_MM = 6;
@@ -41,6 +43,10 @@ export default function CustomEditor() {
   const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
+  const [eraseMode, setEraseMode] = useState(false);
+  const [eraseDraw, setEraseDraw] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const eraseStartRef = useRef<{ x: number; y: number } | null>(null);
+  const originalBgRef = useRef<string | null>(null);
 
   /** Snap threshold in mm. */
   const SNAP_MM = 1.2;
@@ -54,14 +60,147 @@ export default function CustomEditor() {
 
   const sample = students[0];
   const samplePhoto = sample?.photoId ? photos.find((p) => p.id === sample.photoId) : photos[0];
+  const mappedFieldKeys = (Object.keys(FIELD_LABELS) as FieldKey[]).filter((f) => mapping[f]);
 
   const onBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const r = new FileReader();
-    r.onload = () => setDesign({ customBgDataUrl: r.result as string });
+    r.onload = () => {
+      const url = r.result as string;
+      originalBgRef.current = url;
+      setDesign({ customBgDataUrl: url });
+    };
     r.readAsDataURL(file);
   };
+
+  const resetBackground = () => {
+    if (!originalBgRef.current) {
+      toast.message("No original background to restore");
+      return;
+    }
+    setDesign({ customBgDataUrl: originalBgRef.current });
+    toast.success("Background restored");
+  };
+
+  /** Auto-add elements for every mapped Excel field (left column stack + photo). */
+  const autoAddAllFields = () => {
+    if (mappedFieldKeys.length === 0) {
+      toast.error("No fields mapped — go to Step 2 first");
+      return;
+    }
+    const cw = design.customWidth;
+    const ch = design.customHeight;
+    const hasPhoto = photos.length > 0 || students.some((s) => s.photoId);
+    const photoW = 24;
+    const photoH = 28;
+    // Stack fields on left, photo on top-right.
+    const startX = 4;
+    const startY = 4;
+    const rowH = 6;
+    const gap = 1;
+    let y = startY;
+    let count = 0;
+
+    // name first if mapped
+    const ordered: FieldKey[] = [
+      ...(mappedFieldKeys.includes("name") ? (["name"] as FieldKey[]) : []),
+      ...mappedFieldKeys.filter((f) => f !== "name"),
+    ];
+
+    for (const f of ordered) {
+      if (y + rowH > ch - 4) break;
+      const isName = f === "name";
+      addElement({
+        kind: "field",
+        field: f,
+        x: startX,
+        y,
+        w: Math.min(cw - startX * 2, 46),
+        h: rowH,
+        fontSize: isName ? 11 : 8,
+        bold: isName,
+        labelPrefix: isName ? "" : `${FIELD_LABELS[f]}: `,
+      });
+      y += rowH + gap;
+      count++;
+    }
+
+    if (hasPhoto) {
+      // Photo box on top-right
+      addElement({
+        kind: "photo",
+        x: Math.max(0, cw - photoW - 4),
+        y: 4,
+        w: photoW,
+        h: photoH,
+      });
+      count++;
+    }
+
+    toast.success(`Added ${count} element${count === 1 ? "" : "s"} — drag karke arrange karo`);
+  };
+
+  /** Handle eraser drag over the canvas. Coordinates are mm relative to the card. */
+  const onCanvasMouseDown = (e: React.MouseEvent) => {
+    if (!eraseMode) {
+      setSelectedId(null);
+      return;
+    }
+    if (!design.customBgDataUrl) {
+      toast.error("Upload a background image first");
+      return;
+    }
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = (e.clientX - rect.left) / PX_PER_MM;
+    const y = (e.clientY - rect.top) / PX_PER_MM;
+    eraseStartRef.current = { x, y };
+    setEraseDraw({ x, y, w: 0, h: 0 });
+  };
+
+  useEffect(() => {
+    if (!eraseMode || !eraseStartRef.current) return;
+    const move = (e: MouseEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      const start = eraseStartRef.current;
+      if (!rect || !start) return;
+      const cx = (e.clientX - rect.left) / PX_PER_MM;
+      const cy = (e.clientY - rect.top) / PX_PER_MM;
+      const x = Math.min(start.x, cx);
+      const y = Math.min(start.y, cy);
+      const w = Math.abs(cx - start.x);
+      const h = Math.abs(cy - start.y);
+      setEraseDraw({ x, y, w, h });
+    };
+    const up = async () => {
+      const r = eraseDraw;
+      eraseStartRef.current = null;
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      if (!r || r.w < 1 || r.h < 1) {
+        setEraseDraw(null);
+        return;
+      }
+      try {
+        const bg = design.customBgDataUrl;
+        if (!bg) return;
+        if (!originalBgRef.current) originalBgRef.current = bg;
+        const next = await eraseRectsFromImage(bg, [r], design.customWidth, design.customHeight);
+        setDesign({ customBgDataUrl: next });
+      } catch {
+        toast.error("Erase failed");
+      } finally {
+        setEraseDraw(null);
+      }
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, [eraseMode, eraseDraw, design.customBgDataUrl, design.customWidth, design.customHeight, setDesign]);
 
   const addElement = (partial: Partial<CustomElement> & { kind: CustomElement["kind"] }) => {
     const k = partial.kind;
@@ -246,7 +385,6 @@ export default function CustomEditor() {
   };
 
   const selected = design.customElements.find((e) => e.id === selectedId) || null;
-  const mappedFieldKeys = (Object.keys(FIELD_LABELS) as FieldKey[]).filter((f) => mapping[f]);
 
   return (
     <div className="space-y-4">
@@ -371,7 +509,34 @@ export default function CustomEditor() {
         <Button size="sm" variant="outline" onClick={() => addElement({ kind: "qr", w: 14, h: 14 })} title="QR code">
           <QrCode className="h-3.5 w-3.5" /> QR
         </Button>
-        <div className="ml-auto flex gap-1.5">
+        <div className="ml-auto flex gap-1.5 flex-wrap">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={autoAddAllFields}
+            disabled={mappedFieldKeys.length === 0}
+            title={mappedFieldKeys.length === 0 ? "Map fields in Step 2 first" : "Add all mapped Excel fields at once"}
+          >
+            <Wand2 className="h-3.5 w-3.5" /> Auto-add fields
+          </Button>
+          <Button
+            size="sm"
+            variant={eraseMode ? "default" : "outline"}
+            onClick={() => setEraseMode((s) => !s)}
+            disabled={!design.customBgDataUrl}
+            title="Drag on the card to white-out areas of the background"
+          >
+            <Eraser className="h-3.5 w-3.5" /> Erase
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={resetBackground}
+            disabled={!originalBgRef.current}
+            title="Restore original uploaded background"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Reset BG
+          </Button>
           <Button
             size="sm"
             variant={snapEnabled ? "default" : "outline"}
@@ -391,13 +556,19 @@ export default function CustomEditor() {
         </div>
       </div>
 
+      {eraseMode && (
+        <div className="text-xs px-3 py-2 bg-destructive/10 border border-destructive/30 rounded text-destructive">
+          Erase mode ON — drag on the card to white-out areas (e.g. old name/photo placeholders). Click <strong>Erase</strong> again to exit.
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-[1fr_280px] gap-4">
         {/* Canvas */}
         <div className="bg-muted/40 rounded-lg p-6 border overflow-auto flex items-start justify-center">
           <div
             ref={canvasRef}
-            onMouseDown={() => setSelectedId(null)}
-            className="relative bg-white shadow-md select-none"
+            onMouseDown={onCanvasMouseDown}
+            className={cn("relative bg-white shadow-md select-none", eraseMode && "cursor-crosshair")}
             style={{
               width: W,
               height: H,
@@ -410,6 +581,20 @@ export default function CustomEditor() {
               backgroundPosition: "center",
             }}
           >
+            {eraseDraw && (
+              <div
+                className="absolute pointer-events-none border-2 border-destructive bg-destructive/20"
+                style={{
+                  left: eraseDraw.x * PX_PER_MM,
+                  top: eraseDraw.y * PX_PER_MM,
+                  width: eraseDraw.w * PX_PER_MM,
+                  height: eraseDraw.h * PX_PER_MM,
+                }}
+              />
+            )}
+            {eraseMode && (
+              <div className="absolute inset-0 z-10" />
+            )}
             {guides.v.map((x, i) => (
               <div
                 key={`gv-${i}`}
