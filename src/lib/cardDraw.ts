@@ -135,14 +135,26 @@ function getValue(student: Student, mapping: ColumnMapping, key: string, design?
   return v;
 }
 
-function tryAddImage(doc: jsPDF, dataUrl: string, fmt: "JPEG" | "PNG", x: number, y: number, w: number, h: number) {
+function detectImageFormat(dataUrl: string): "JPEG" | "PNG" {
+  // data:image/png;base64,... | data:image/jpeg;... | data:image/jpg;...
+  const m = /^data:image\/(png|jpe?g|webp)/i.exec(dataUrl || "");
+  if (!m) return "PNG";
+  const t = m[1].toLowerCase();
+  if (t === "png") return "PNG";
+  return "JPEG";
+}
+
+function tryAddImage(doc: jsPDF, dataUrl: string, _fmt: "JPEG" | "PNG", x: number, y: number, w: number, h: number) {
+  if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) return;
+  if (!(w > 0) || !(h > 0)) return;
+  const detected = detectImageFormat(dataUrl);
   try {
-    doc.addImage(dataUrl, fmt, x, y, w, h);
+    doc.addImage(dataUrl, detected, x, y, w, h, undefined, "FAST");
   } catch {
     try {
-      doc.addImage(dataUrl, fmt === "JPEG" ? "PNG" : "JPEG", x, y, w, h);
+      doc.addImage(dataUrl, detected === "JPEG" ? "PNG" : "JPEG", x, y, w, h, undefined, "FAST");
     } catch {
-      /* ignore */
+      /* ignore — leave the placeholder rect */
     }
   }
 }
