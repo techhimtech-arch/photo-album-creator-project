@@ -309,6 +309,24 @@ export default function CustomEditor() {
         <Button size="sm" variant="outline" onClick={() => addElement({ kind: "signature", w: 24, h: 8 })}>
           <ImageIcon className="h-3.5 w-3.5" /> Signature
         </Button>
+        <div className="ml-auto flex gap-1.5">
+          <Button
+            size="sm"
+            variant={snapEnabled ? "default" : "outline"}
+            onClick={() => setSnapEnabled((s) => !s)}
+            title="Snap to edges, centers and other elements"
+          >
+            Snap
+          </Button>
+          <Button
+            size="sm"
+            variant={showGrid ? "default" : "outline"}
+            onClick={() => setShowGrid((s) => !s)}
+            title="Show 2mm grid"
+          >
+            Grid
+          </Button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_280px] gap-4">
