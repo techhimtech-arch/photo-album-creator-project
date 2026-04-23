@@ -155,6 +155,21 @@ export default function StepDesign() {
             </div>
           ))}
         </div>
+
+        {design.template !== "custom" && (
+          <div className="flex items-start gap-3 p-3 bg-muted/40 border rounded-md">
+            <Wand2 className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">Want to tweak this template?</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Convert it to an editable layout — same design, but you can drag, resize and restyle every element.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={convertToEditable}>
+              Customize this template
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Card size (mm) — works for all templates */}
