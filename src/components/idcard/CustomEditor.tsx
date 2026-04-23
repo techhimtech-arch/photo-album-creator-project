@@ -64,22 +64,30 @@ export default function CustomEditor() {
   };
 
   const addElement = (partial: Partial<CustomElement> & { kind: CustomElement["kind"] }) => {
+    const k = partial.kind;
+    const isShape = k === "line" || k === "rect" || k === "divider" || k === "qr";
     const el: CustomElement = {
       id: `el_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      kind: partial.kind,
+      kind: k,
       field: partial.field,
-      text: partial.text ?? "",
+      text: partial.text ?? (k === "divider" ? "INFO" : ""),
       labelPrefix: partial.labelPrefix ?? "",
+      dateFormat: partial.dateFormat,
       x: partial.x ?? design.customWidth / 2 - 10,
       y: partial.y ?? design.customHeight / 2 - 5,
-      w: partial.w ?? (partial.kind === "photo" ? 24 : 30),
-      h: partial.h ?? (partial.kind === "photo" ? 28 : 5),
-      fontSize: partial.fontSize ?? 9,
+      w: partial.w ?? (k === "photo" ? 24 : k === "qr" ? 14 : k === "line" ? 30 : k === "rect" ? 30 : 30),
+      h: partial.h ?? (k === "photo" ? 28 : k === "qr" ? 14 : k === "line" ? 0.6 : k === "rect" ? 12 : k === "divider" ? 4 : 5),
+      fontSize: partial.fontSize ?? (k === "divider" ? 6 : 9),
       fontFamily: partial.fontFamily ?? "helvetica",
       bold: partial.bold ?? (partial.field === "name"),
       italic: partial.italic ?? false,
       color: partial.color ?? "#111111",
       align: partial.align ?? "left",
+      thickness: partial.thickness ?? (k === "line" || k === "divider" ? 0.4 : k === "rect" ? 0.3 : undefined),
+      fillColor: partial.fillColor ?? (k === "rect" ? "none" : undefined),
+      borderColor: partial.borderColor ?? (k === "rect" ? "#111111" : undefined),
+      radius: partial.radius ?? (k === "rect" ? 1 : undefined),
+      qrSourceField: partial.qrSourceField ?? (k === "qr" ? "admissionNo" : undefined),
     };
     addCustomElement(el);
     setSelectedId(el.id);
