@@ -4,10 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, ArrowRight, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Upload, X, Wand2 } from "lucide-react";
 import { FIELD_LABELS, type CardTemplate, type FieldKey } from "@/types/idcard";
 import { cn } from "@/lib/utils";
 import CustomEditor from "./CustomEditor";
+import { templateToCustomElements } from "@/lib/template-to-custom";
+import { toast } from "sonner";
 
 const TEMPLATES: { key: CardTemplate; label: string; desc: string }[] = [
   { key: "vertical-classic", label: "Vertical · Classic", desc: "Photo top, accent corner, footer band" },
@@ -117,6 +119,16 @@ export default function StepDesign() {
     (f) => f !== "name" && Boolean(mapping[f]),
   );
 
+  const convertToEditable = () => {
+    const elements = templateToCustomElements(design);
+    setDesign({
+      template: "custom",
+      customElements: elements,
+      customBgDataUrl: null,
+    });
+    toast.success("Template converted to editable layout. Drag any element to customize.");
+  };
+
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
@@ -143,6 +155,21 @@ export default function StepDesign() {
             </div>
           ))}
         </div>
+
+        {design.template !== "custom" && (
+          <div className="flex items-start gap-3 p-3 bg-muted/40 border rounded-md">
+            <Wand2 className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">Want to tweak this template?</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Convert it to an editable layout — same design, but you can drag, resize and restyle every element.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={convertToEditable}>
+              Customize this template
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Card size (mm) — works for all templates */}
