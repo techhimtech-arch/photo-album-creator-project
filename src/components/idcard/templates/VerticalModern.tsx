@@ -39,7 +39,8 @@ export default function VerticalModern({ student, photo, mapping, design }: Card
         <div className="text-[12.5px] font-bold mt-2 px-3 truncate max-w-full text-center">{name}</div>
       </div>
 
-      <div className="px-3 mt-2 flex-1 overflow-hidden">
+      <div className="px-3 mt-2 flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1">
         {fields.map((f) => {
           const col = mapping[f];
           if (!col) return null;
@@ -56,6 +57,17 @@ export default function VerticalModern({ student, photo, mapping, design }: Card
             </div>
           );
         })}
+        </div>
+        {(design.signatureDataUrl || design.principalName) && (
+          <div className="flex flex-col items-center pt-1">
+            {design.signatureDataUrl && (
+              <img src={design.signatureDataUrl} alt="signature" className="h-5 object-contain" />
+            )}
+            <div className="text-[6.5px] text-gray-500 leading-none mt-0.5">
+              {design.principalName || "Principal"}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

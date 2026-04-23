@@ -317,16 +317,39 @@ export default function CustomEditor() {
         </Button>
         <Select onValueChange={(v) => addElement({ kind: "field", field: v as FieldKey })}>
           <SelectTrigger className="h-8 w-[150px] text-xs">
-            <SelectValue placeholder="+ Field" />
+            <SelectValue placeholder={mappedFieldKeys.length === 0 ? "No mapped fields" : "+ Field"} />
           </SelectTrigger>
           <SelectContent>
-            {mappedFieldKeys.map((f) => (
-              <SelectItem key={f} value={f}>
-                {FIELD_LABELS[f]}
-              </SelectItem>
-            ))}
+            {mappedFieldKeys.length === 0 ? (
+              <div className="px-2 py-1.5 text-xs text-muted-foreground max-w-[220px]">
+                No fields mapped yet — go to Step 2: Map columns to add fields.
+              </div>
+            ) : (
+              mappedFieldKeys.map((f) => (
+                <SelectItem key={f} value={f}>
+                  {FIELD_LABELS[f]}
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            addElement({
+              kind: "text",
+              text: design.principalName || "Principal",
+              fontSize: 6,
+              align: "center",
+              w: 24,
+              h: 4,
+            })
+          }
+          title="Add principal label"
+        >
+          <Type className="h-3.5 w-3.5" /> Principal
+        </Button>
         <Button size="sm" variant="outline" onClick={() => addElement({ kind: "text", text: "ID CARD" })}>
           <Plus className="h-3.5 w-3.5" /> Text
         </Button>

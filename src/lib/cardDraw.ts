@@ -227,6 +227,20 @@ function drawVerticalClassic({ doc, x, y, student, photo, mapping, design }: Dra
     safeText(doc, addr, x + 3, fy + 2.4, W - 6, { lineHeight: 2.4, maxLines: 2 });
   }
 
+  // Signature row above footer
+  if (design.signatureDataUrl || design.principalName) {
+    const sigW = 20, sigH = 6;
+    const sigX = x + W - sigW - 2;
+    const sigY = y + H - footerH - sigH - 2;
+    if (design.signatureDataUrl) {
+      tryAddImage(doc, design.signatureDataUrl, "PNG", sigX, sigY, sigW, sigH);
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(4.8);
+    doc.setTextColor(110);
+    doc.text(design.principalName || "Principal", sigX + sigW / 2, sigY + sigH + 2, { align: "center" });
+  }
+
   // Footer band — contact only (school name is in header now)
   doc.setFillColor(rgb[0], rgb[1], rgb[2]);
   doc.rect(x, y + H - footerH, W, footerH, "F");
@@ -401,6 +415,20 @@ function drawVerticalModern({ doc, x, y, student, photo, mapping, design }: Draw
     doc.line(x + 3, fy - 0.5, x + W - 3, fy - 0.5);
     fy += 1;
   }
+
+  // Signature near bottom-right
+  if (design.signatureDataUrl || design.principalName) {
+    const sigW = 22, sigH = 6;
+    const sigX = x + W - sigW - 2;
+    const sigY = y + H - sigH - 5;
+    if (design.signatureDataUrl) {
+      tryAddImage(doc, design.signatureDataUrl, "PNG", sigX, sigY, sigW, sigH);
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(4.8);
+    doc.setTextColor(110);
+    doc.text(design.principalName || "Principal", sigX + sigW / 2, sigY + sigH + 2, { align: "center" });
+  }
 }
 
 /* ============ TEMPLATE: HORIZONTAL MODERN ============ */
@@ -479,6 +507,20 @@ function drawHorizontalModern({ doc, x, y, student, photo, mapping, design }: Dr
   doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
   doc.setLineWidth(0.3);
   doc.line(x + sbW + 3, y + H - 2.5, x + W - 3, y + H - 2.5);
+
+  // Signature in bottom-right
+  if (design.signatureDataUrl || design.principalName) {
+    const sigW = 20, sigH = 6;
+    const sigX = x + W - sigW - 2;
+    const sigY = y + H - sigH - 4;
+    if (design.signatureDataUrl) {
+      tryAddImage(doc, design.signatureDataUrl, "PNG", sigX, sigY, sigW, sigH);
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(4.5);
+    doc.setTextColor(110);
+    doc.text(design.principalName || "Principal", sigX + sigW / 2, sigY + sigH + 1.8, { align: "center" });
+  }
 }
 
 /* ============ TEMPLATE: CUSTOM (drag-and-drop) ============ */

@@ -91,6 +91,12 @@ export function templateToCustomElements(design: CardDesign): CustomElement[] {
         y += 4;
       });
 
+      // Signature (right-bottom, just above footer)
+      els.push(makeShape("signature", W - 22, H - 12, 20, 6));
+      els.push(makeText(design.principalName || "Principal", W - 22, H - 6, 20, 3, {
+        fontSize: 5, align: "center", color: "#666666",
+      }));
+
       // Footer contact
       els.push(makeText(
         [design.contactPhone, design.contactEmail].filter(Boolean).join("  ·  "),
@@ -125,6 +131,11 @@ export function templateToCustomElements(design: CardDesign): CustomElement[] {
         els.push(makeField(f, 3, y, W - 6, 3.5, { fontSize: 6.5 }));
         y += 4;
       });
+      // Signature near bottom-center-right
+      els.push(makeShape("signature", W - 24, H - 10, 22, 6));
+      els.push(makeText(design.principalName || "Principal", W - 24, H - 4, 22, 3, {
+        fontSize: 5, align: "center", color: "#666666",
+      }));
       break;
     }
 
@@ -192,6 +203,11 @@ export function templateToCustomElements(design: CardDesign): CustomElement[] {
         els.push(makeField(f, textX, y, textW, 3.5, { fontSize: 6.5 }));
         y += 4;
       });
+      // Signature in bottom-right of right text panel
+      els.push(makeShape("signature", W - 22, H - 10, 20, 6));
+      els.push(makeText(design.principalName || "Principal", W - 22, H - 4, 20, 3, {
+        fontSize: 5, align: "center", color: "#666666",
+      }));
       break;
     }
   }
