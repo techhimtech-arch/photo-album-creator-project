@@ -37,6 +37,14 @@ export default function CustomEditor() {
         elStartH: number;
       }
   >(null);
+  const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
+
+  /** Snap threshold in mm. */
+  const SNAP_MM = 1.2;
+  /** Grid step in mm. */
+  const GRID_MM = 2;
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -79,27 +87,119 @@ export default function CustomEditor() {
   // Mouse drag handlers
   useEffect(() => {
     if (!drag) return;
+    const others = design.customElements.filter((e) => e.id !== drag.id);
+    const cw = design.customWidth;
+    const ch = design.customHeight;
+
+    /** Returns nearest snap target for a value `v` against candidates, plus the matched candidate. */
+    const snap = (v: number, candidates: number[]) => {
+      if (!snapEnabled) return { v, hit: null as number | null };
+      let best = v;
+      let hit: number | null = null;
+      let bestDist = SNAP_MM;
+      for (const c of candidates) {
+        const d = Math.abs(v - c);
+        if (d < bestDist) {
+          bestDist = d;
+          best = c;
+          hit = c;
+        }
+      }
+      // grid snap fallback
+      if (hit === null && snapEnabled) {
+        const g = Math.round(v / GRID_MM) * GRID_MM;
+        if (Math.abs(v - g) < SNAP_MM / 2) best = g;
+      }
+      return { v: best, hit };
+    };
+
     const move = (e: MouseEvent) => {
       const dx = (e.clientX - drag.startX) / PX_PER_MM;
       const dy = (e.clientY - drag.startY) / PX_PER_MM;
+
+      // Build candidate guide lines from siblings + card edges/center
+      const xCands = [0, cw / 2, cw];
+      const yCands = [0, ch / 2, ch];
+      for (const o of others) {
+        xCands.push(o.x, o.x + o.w / 2, o.x + o.w);
+        yCands.push(o.y, o.y + o.h / 2, o.y + o.h);
+      }
+
       if (drag.mode === "move") {
-        const nx = Math.max(0, Math.min(design.customWidth - drag.elStartW, drag.elStartX + dx));
-        const ny = Math.max(0, Math.min(design.customHeight - drag.elStartH, drag.elStartY + dy));
+        let nx = Math.max(0, Math.min(cw - drag.elStartW, drag.elStartX + dx));
+        let ny = Math.max(0, Math.min(ch - drag.elStartH, drag.elStartY + dy));
+        const w = drag.elStartW;
+        const h = drag.elStartH;
+
+        // try snapping left, center, right
+        const sLeft = snap(nx, xCands);
+        const sCenter = snap(nx + w / 2, xCands);
+        const sRight = snap(nx + w, xCands);
+        const vHits: number[] = [];
+        // pick the closest of the three
+        const xOpts = [
+          { delta: sLeft.v - nx, hit: sLeft.hit },
+          { delta: sCenter.v - (nx + w / 2), hit: sCenter.hit },
+          { delta: sRight.v - (nx + w), hit: sRight.hit },
+        ].filter((o) => o.hit !== null);
+        if (xOpts.length) {
+          xOpts.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
+          nx += xOpts[0].delta;
+          vHits.push(xOpts[0].hit as number);
+        }
+
+        const sTop = snap(ny, yCands);
+        const sMid = snap(ny + h / 2, yCands);
+        const sBot = snap(ny + h, yCands);
+        const hHits: number[] = [];
+        const yOpts = [
+          { delta: sTop.v - ny, hit: sTop.hit },
+          { delta: sMid.v - (ny + h / 2), hit: sMid.hit },
+          { delta: sBot.v - (ny + h), hit: sBot.hit },
+        ].filter((o) => o.hit !== null);
+        if (yOpts.length) {
+          yOpts.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
+          ny += yOpts[0].delta;
+          hHits.push(yOpts[0].hit as number);
+        }
+
+        nx = Math.max(0, Math.min(cw - w, nx));
+        ny = Math.max(0, Math.min(ch - h, ny));
+        setGuides({ v: vHits, h: hHits });
         updateCustomElement(drag.id, { x: nx, y: ny });
       } else {
-        const nw = Math.max(4, Math.min(design.customWidth - drag.elStartX, drag.elStartW + dx));
-        const nh = Math.max(3, Math.min(design.customHeight - drag.elStartY, drag.elStartH + dy));
+        let nw = Math.max(4, Math.min(cw - drag.elStartX, drag.elStartW + dx));
+        let nh = Math.max(3, Math.min(ch - drag.elStartY, drag.elStartH + dy));
+        // snap right edge / bottom edge
+        const sR = snap(drag.elStartX + nw, xCands);
+        const sB = snap(drag.elStartY + nh, yCands);
+        const vHits: number[] = [];
+        const hHits: number[] = [];
+        if (sR.hit !== null) {
+          nw = sR.v - drag.elStartX;
+          vHits.push(sR.hit);
+        }
+        if (sB.hit !== null) {
+          nh = sB.v - drag.elStartY;
+          hHits.push(sB.hit);
+        }
+        nw = Math.max(4, Math.min(cw - drag.elStartX, nw));
+        nh = Math.max(3, Math.min(ch - drag.elStartY, nh));
+        setGuides({ v: vHits, h: hHits });
         updateCustomElement(drag.id, { w: nw, h: nh });
       }
     };
-    const up = () => setDrag(null);
+    const up = () => {
+      setDrag(null);
+      setGuides({ v: [], h: [] });
+    };
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
     return () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
     };
-  }, [drag, design.customWidth, design.customHeight, updateCustomElement]);
+  }, [drag, design.customWidth, design.customHeight, design.customElements, snapEnabled, updateCustomElement]);
 
   const startDrag = (
     e: React.MouseEvent,
@@ -209,6 +309,24 @@ export default function CustomEditor() {
         <Button size="sm" variant="outline" onClick={() => addElement({ kind: "signature", w: 24, h: 8 })}>
           <ImageIcon className="h-3.5 w-3.5" /> Signature
         </Button>
+        <div className="ml-auto flex gap-1.5">
+          <Button
+            size="sm"
+            variant={snapEnabled ? "default" : "outline"}
+            onClick={() => setSnapEnabled((s) => !s)}
+            title="Snap to edges, centers and other elements"
+          >
+            Snap
+          </Button>
+          <Button
+            size="sm"
+            variant={showGrid ? "default" : "outline"}
+            onClick={() => setShowGrid((s) => !s)}
+            title="Show 2mm grid"
+          >
+            Grid
+          </Button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_280px] gap-4">
@@ -221,11 +339,29 @@ export default function CustomEditor() {
             style={{
               width: W,
               height: H,
-              backgroundImage: design.customBgDataUrl ? `url(${design.customBgDataUrl})` : undefined,
-              backgroundSize: "cover",
+              backgroundImage: design.customBgDataUrl
+                ? `url(${design.customBgDataUrl})`
+                : showGrid
+                ? `linear-gradient(to right, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)`
+                : undefined,
+              backgroundSize: design.customBgDataUrl ? "cover" : `${GRID_MM * PX_PER_MM}px ${GRID_MM * PX_PER_MM}px`,
               backgroundPosition: "center",
             }}
           >
+            {guides.v.map((x, i) => (
+              <div
+                key={`gv-${i}`}
+                className="absolute top-0 bottom-0 pointer-events-none"
+                style={{ left: x * PX_PER_MM, width: 1, background: "hsl(var(--primary))" }}
+              />
+            ))}
+            {guides.h.map((y, i) => (
+              <div
+                key={`gh-${i}`}
+                className="absolute left-0 right-0 pointer-events-none"
+                style={{ top: y * PX_PER_MM, height: 1, background: "hsl(var(--primary))" }}
+              />
+            ))}
             {design.customElements.map((el) => {
               const isSel = el.id === selectedId;
               return (
