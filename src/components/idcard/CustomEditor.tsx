@@ -1089,4 +1089,15 @@ export default function CustomEditor() {
       </div>
     </div>
   );
+
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background overflow-auto p-4 sm:p-6">
+        <div className="max-w-[1600px] mx-auto h-full">
+          {editorBody}
+        </div>
+      </div>
+    );
+  }
+  return editorBody;
 }
