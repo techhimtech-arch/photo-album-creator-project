@@ -633,7 +633,7 @@ export default function CustomEditor() {
 
       <div className={cn("grid gap-4", fullscreen ? "lg:grid-cols-[1fr_340px] flex-1 min-h-0" : "lg:grid-cols-[1fr_280px]")}>
         {/* Canvas */}
-        <div className="bg-muted/40 rounded-lg p-6 border overflow-auto flex items-start justify-center">
+        <div className={cn("bg-muted/40 rounded-lg p-6 border overflow-auto flex items-start justify-center", fullscreen && "lg:max-h-full")}>
           <div
             ref={canvasRef}
             onMouseDown={onCanvasMouseDown}
