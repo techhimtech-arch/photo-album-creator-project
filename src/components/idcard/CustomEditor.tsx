@@ -21,7 +21,8 @@ import { fitImageToCard } from "@/lib/bg-fit";
 import { toast } from "sonner";
 
 /** On-screen scale for the editor — larger than preview so dragging is precise. */
-const PX_PER_MM = 6;
+const PX_PER_MM_NORMAL = 6;
+const PX_PER_MM_FULL = 9;
 
 export default function CustomEditor() {
   const { design, setDesign, addCustomElement, updateCustomElement, removeCustomElement, students, photos, mapping } =
