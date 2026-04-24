@@ -17,6 +17,7 @@ import { Trash2, Image as ImageIcon, Type, User, Plus, AlignLeft, AlignCenter, A
 import { cn } from "@/lib/utils";
 import { DATE_FORMAT_OPTIONS, formatDate } from "@/lib/format-date";
 import { eraseRectsFromImage } from "@/lib/bg-eraser";
+import { fitImageToCard } from "@/lib/bg-fit";
 import { toast } from "sonner";
 
 /** On-screen scale for the editor — larger than preview so dragging is precise. */
