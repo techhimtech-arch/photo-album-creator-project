@@ -66,21 +66,67 @@ export default function CustomEditor() {
   const onBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image too large (max 8 MB) — please compress or export at lower DPI");
+      e.target.value = "";
+      return;
+    }
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+      toast.error("Use PNG, JPG, or WebP — other formats won't render in PDF");
+      e.target.value = "";
+      return;
+    }
     const r = new FileReader();
-    r.onload = () => {
+    r.onload = async () => {
       const url = r.result as string;
-      originalBgRef.current = url;
-      setDesign({ customBgDataUrl: url });
+      try {
+        const fit = await fitImageToCard(url, design.customWidth, design.customHeight);
+        originalBgRef.current = url;
+        setDesign({ customBgDataUrl: fit.dataUrl });
+        if (fit.padded) {
+          toast.success(
+            `Background fit to ${design.customWidth}×${design.customHeight}mm — white padding added so fields align exactly in PDF`,
+          );
+        } else {
+          toast.success("Background uploaded — aspect ratio matches card");
+        }
+      } catch {
+        // Fallback: use raw image (preview will object-cover crop)
+        originalBgRef.current = url;
+        setDesign({ customBgDataUrl: url });
+        toast.message("Background uploaded (could not auto-fit)");
+      }
     };
     r.readAsDataURL(file);
   };
 
-  const resetBackground = () => {
+  /** Re-fit the original background whenever the card dimensions change. */
+  useEffect(() => {
+    const orig = originalBgRef.current;
+    if (!orig) return;
+    let cancelled = false;
+    fitImageToCard(orig, design.customWidth, design.customHeight)
+      .then((fit) => {
+        if (!cancelled) setDesign({ customBgDataUrl: fit.dataUrl });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [design.customWidth, design.customHeight]);
+
+  const resetBackground = async () => {
     if (!originalBgRef.current) {
       toast.message("No original background to restore");
       return;
     }
-    setDesign({ customBgDataUrl: originalBgRef.current });
+    try {
+      const fit = await fitImageToCard(originalBgRef.current, design.customWidth, design.customHeight);
+      setDesign({ customBgDataUrl: fit.dataUrl });
+    } catch {
+      setDesign({ customBgDataUrl: originalBgRef.current });
+    }
     toast.success("Background restored");
   };
 
