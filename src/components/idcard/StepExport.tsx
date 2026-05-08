@@ -266,6 +266,47 @@ export default function StepExport() {
         )}
       </div>
 
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <div>
+          <div className="font-medium text-sm">Project backup</div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Save the entire project (data + photos + design) as a .json file. Import it on any device to continue.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              exportProject({ step, headers, rows, mapping, photos, students, design })
+            }
+          >
+            <FileJson className="h-4 w-4" /> Export project (.json)
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              try {
+                const s = await importProject(f);
+                hydrate(s);
+                toast({ title: "Project imported", description: `${s.rows.length} students loaded.` });
+              } catch {
+                toast({ title: "Invalid file", description: "Could not read the project file." });
+              }
+              e.target.value = "";
+            }}
+          />
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            <Upload className="h-4 w-4" /> Import project
+          </Button>
+        </div>
+      </div>
+
       <div className="flex justify-between">
         <Button variant="outline" onClick={() => setStep(3)}>
           <ArrowLeft className="h-4 w-4" /> Back
