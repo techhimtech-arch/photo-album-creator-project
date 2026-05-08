@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import { useIdStore } from "@/lib/idcard-store";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Loader2, FileJson, Upload } from "lucide-react";
 import CardPreview from "./CardPreview";
 import { drawCard, drawCropMarks, drawCutGridLines, withRotatedCard, prewarmImageCache } from "@/lib/cardDraw";
+import { exportProject, importProject } from "@/lib/persistence";
+import { toast } from "@/hooks/use-toast";
 
 type PageSizeKey = "a4" | "a4-landscape" | "letter" | "a3";
 type CutStyle = "none" | "corners" | "grid";
