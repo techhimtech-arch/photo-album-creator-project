@@ -30,8 +30,9 @@ function computeFit(pageW: number, pageH: number, cardW: number, cardH: number, 
 }
 
 export default function StepExport() {
-  const { students, photos, mapping, design, setStep } = useIdStore();
+  const { students, photos, mapping, design, setStep, headers, rows, step, hydrate } = useIdStore();
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [pageSize, setPageSize] = useState<PageSizeKey>("a4");
   const [margin, setMargin] = useState(5);
