@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import type { CardDesign, ColumnMapping, CustomElement, FieldKey, PhotoFile, Student } from "@/types/idcard";
 import { TEMPLATE_ORIENTATION } from "@/types/idcard";
+import { saveState, clearState, type PersistedState } from "@/lib/persistence";
 
 interface State {
+  hydrate: (s: PersistedState) => void;
   step: number;
   headers: string[];
   rows: Record<string, string>[];
