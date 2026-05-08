@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIdStore } from "@/lib/idcard-store";
-import { Check, FileSpreadsheet, Columns3, Users, Palette, FileDown, IdCard, RotateCcw } from "lucide-react";
+import { Check, FileSpreadsheet, Columns3, Users, Palette, FileDown, IdCard, RotateCcw, FileJson, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import InstallPWA from "@/components/InstallPWA";
-import { getStorageEstimate } from "@/lib/persistence";
+import { getStorageEstimate, exportProject, importProject } from "@/lib/persistence";
+import { toast } from "@/hooks/use-toast";
 
 const STEPS = [
   { label: "Upload", icon: FileSpreadsheet },
@@ -15,7 +16,8 @@ const STEPS = [
 ];
 
 export default function Stepper() {
-  const { step, setStep, rows, reset } = useIdStore();
+  const { step, setStep, rows, reset, headers, mapping, photos, students, design, hydrate } = useIdStore();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [storage, setStorage] = useState<{ usageMB: number; quotaMB: number } | null>(null);
 
@@ -87,6 +89,45 @@ export default function Stepper() {
             Storage: {storage.usageMB} MB used
           </div>
         )}
+        <div className="flex gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 px-2"
+            disabled={rows.length === 0}
+            onClick={() => exportProject({ step, headers, rows, mapping, photos, students, design })}
+            title="Export project as .json backup"
+          >
+            <FileJson className="h-3.5 w-3.5" /> Backup
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 px-2"
+            onClick={() => fileRef.current?.click()}
+            title="Import project from .json"
+          >
+            <Upload className="h-3.5 w-3.5" /> Restore
+          </Button>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            try {
+              const s = await importProject(f);
+              hydrate(s);
+              toast({ title: "Project restored", description: `${s.rows.length} students loaded.` });
+            } catch {
+              toast({ title: "Invalid file", description: "Could not read the project file." });
+            }
+            e.target.value = "";
+          }}
+        />
         <InstallPWA />
         <Button variant="ghost" size="sm" onClick={reset} className="w-full justify-start text-muted-foreground">
           <RotateCcw className="h-3.5 w-3.5" /> Start over
