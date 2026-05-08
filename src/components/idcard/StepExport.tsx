@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import { useIdStore } from "@/lib/idcard-store";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Loader2, FileJson, Upload } from "lucide-react";
 import CardPreview from "./CardPreview";
 import { drawCard, drawCropMarks, drawCutGridLines, withRotatedCard, prewarmImageCache } from "@/lib/cardDraw";
+import { exportProject, importProject } from "@/lib/persistence";
+import { toast } from "@/hooks/use-toast";
 
 type PageSizeKey = "a4" | "a4-landscape" | "letter" | "a3";
 type CutStyle = "none" | "corners" | "grid";
@@ -28,8 +30,9 @@ function computeFit(pageW: number, pageH: number, cardW: number, cardH: number, 
 }
 
 export default function StepExport() {
-  const { students, photos, mapping, design, setStep } = useIdStore();
+  const { students, photos, mapping, design, setStep, headers, rows, step, hydrate } = useIdStore();
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [pageSize, setPageSize] = useState<PageSizeKey>("a4");
   const [margin, setMargin] = useState(5);
@@ -261,6 +264,47 @@ export default function StepExport() {
             Showing first {sample.length} of {students.length} cards.
           </p>
         )}
+      </div>
+
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <div>
+          <div className="font-medium text-sm">Project backup</div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Save the entire project (data + photos + design) as a .json file. Import it on any device to continue.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              exportProject({ step, headers, rows, mapping, photos, students, design })
+            }
+          >
+            <FileJson className="h-4 w-4" /> Export project (.json)
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              try {
+                const s = await importProject(f);
+                hydrate(s);
+                toast({ title: "Project imported", description: `${s.rows.length} students loaded.` });
+              } catch {
+                toast({ title: "Invalid file", description: "Could not read the project file." });
+              }
+              e.target.value = "";
+            }}
+          />
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            <Upload className="h-4 w-4" /> Import project
+          </Button>
+        </div>
       </div>
 
       <div className="flex justify-between">

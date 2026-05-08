@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import type { CardDesign, ColumnMapping, CustomElement, FieldKey, PhotoFile, Student } from "@/types/idcard";
 import { TEMPLATE_ORIENTATION } from "@/types/idcard";
+import { saveState, clearState, type PersistedState } from "@/lib/persistence";
 
 interface State {
+  hydrate: (s: PersistedState) => void;
   step: number;
   headers: string[];
   rows: Record<string, string>[];
@@ -115,7 +117,18 @@ export const useIdStore = create<State>((set, get) => ({
     set({
       design: { ...get().design, customElements: get().design.customElements.filter((e) => e.id !== id) },
     }),
-  reset: () =>
+  hydrate: (s) =>
+    set({
+      step: s.step,
+      headers: s.headers,
+      rows: s.rows,
+      mapping: s.mapping,
+      photos: s.photos,
+      students: s.students,
+      design: s.design,
+    }),
+  reset: () => {
+    void clearState();
     set({
       step: 0,
       headers: [],
@@ -124,5 +137,30 @@ export const useIdStore = create<State>((set, get) => ({
       photos: [],
       students: [],
       design: defaultDesign,
-    }),
+    });
+  },
 }));
+
+// Auto-save (debounced) — skip the very first emission so reset/hydrate don't race.
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let firstEmit = true;
+useIdStore.subscribe((s) => {
+  if (firstEmit) {
+    firstEmit = false;
+    return;
+  }
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    void saveState({
+      step: s.step,
+      headers: s.headers,
+      rows: s.rows,
+      mapping: s.mapping,
+      photos: s.photos,
+      students: s.students,
+      design: s.design,
+    });
+    window.dispatchEvent(new CustomEvent("idcard:saved"));
+  }, 600);
+});
+
