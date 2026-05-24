@@ -81,6 +81,13 @@ export const useIdStore = create<State>((set, get) => ({
     set({
       students: get().students.map((s) => (s.id === studentId ? { ...s, photoId } : s)),
     }),
+  updateRow: (rowIndex, row) => {
+    const rows = get().rows.slice();
+    if (rowIndex < 0 || rowIndex >= rows.length) return;
+    rows[rowIndex] = row;
+    const students = get().students.map((s, i) => (i === rowIndex ? { ...s, row } : s));
+    set({ rows, students });
+  },
   setDesign: (d) => {
     const prev = get().design;
     const next = { ...prev, ...d };
