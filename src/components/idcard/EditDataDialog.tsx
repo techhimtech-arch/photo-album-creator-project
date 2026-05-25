@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Pencil, Search } from "lucide-react";
 import { useIdStore } from "@/lib/idcard-store";
@@ -98,7 +97,7 @@ export default function EditDataDialog({ open, onClose }: Props) {
                 />
               </div>
             </div>
-            <ScrollArea className="flex-1 min-h-0 px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="flex-1 min-h-0 px-4 sm:px-6 pb-4 sm:pb-6 overflow-y-auto">
               <div className="space-y-1 py-2">
                 {filtered.length === 0 && (
                   <p className="text-sm text-muted-foreground py-8 text-center">No matches.</p>
@@ -126,11 +125,12 @@ export default function EditDataDialog({ open, onClose }: Props) {
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
           </>
         ) : (
           <>
-            <ScrollArea className="flex-1 min-h-0 px-4 sm:px-6">
+            <div className="flex-1 min-h-0 px-4 sm:px-6 overflow-y-auto">
+
               <div className="space-y-3 py-2">
                 {headers.map((h) => {
                   const isDob = mapping.dob === h;
@@ -159,7 +159,7 @@ export default function EditDataDialog({ open, onClose }: Props) {
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
             <div className="flex justify-end gap-2 px-4 sm:px-6 py-3 border-t shrink-0">
               <Button variant="outline" onClick={() => setSelectedIndex(null)}>
                 Cancel
