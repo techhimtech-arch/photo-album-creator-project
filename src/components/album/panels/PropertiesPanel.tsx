@@ -144,6 +144,9 @@ function ImageProps({
             <SelectItem value="rounded">Rounded</SelectItem>
             <SelectItem value="circle">Circle</SelectItem>
             <SelectItem value="heart">Heart</SelectItem>
+            <SelectItem value="star">Star</SelectItem>
+            <SelectItem value="hexagon">Hexagon</SelectItem>
+            <SelectItem value="triangle">Triangle</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -211,6 +214,47 @@ function ImageProps({
           }
           onValueCommit={commit}
         />
+      </div>
+      <div className="space-y-3 pt-3 border-t">
+        <Label className="font-semibold block mb-2">Adjustments & Filters</Label>
+        
+        <div className="flex gap-2 mb-4">
+          <Button
+            variant={layer.filters?.grayscale ? "default" : "outline"}
+            size="sm"
+            className="flex-1 text-xs"
+            onClick={() => {
+              patch({ filters: { ...layer.filters, grayscale: !layer.filters?.grayscale } } as Partial<ImageLayer>);
+              commit();
+            }}
+          >
+            Grayscale
+          </Button>
+          <Button
+            variant={layer.filters?.sepia ? "default" : "outline"}
+            size="sm"
+            className="flex-1 text-xs"
+            onClick={() => {
+              patch({ filters: { ...layer.filters, sepia: !layer.filters?.sepia } } as Partial<ImageLayer>);
+              commit();
+            }}
+          >
+            Sepia
+          </Button>
+        </div>
+
+        <div>
+          <div className="flex justify-between"><Label>Brightness</Label><span className="text-xs text-muted-foreground">{Math.round((layer.filters?.brightness ?? 0) * 100)}</span></div>
+          <Slider min={-1} max={1} step={0.05} value={[layer.filters?.brightness ?? 0]} onValueChange={(v) => patch({ filters: { ...layer.filters, brightness: v[0] } } as Partial<ImageLayer>)} onValueCommit={commit} />
+        </div>
+        <div>
+          <div className="flex justify-between"><Label>Contrast</Label><span className="text-xs text-muted-foreground">{Math.round(layer.filters?.contrast ?? 0)}</span></div>
+          <Slider min={-100} max={100} step={1} value={[layer.filters?.contrast ?? 0]} onValueChange={(v) => patch({ filters: { ...layer.filters, contrast: v[0] } } as Partial<ImageLayer>)} onValueCommit={commit} />
+        </div>
+        <div>
+          <div className="flex justify-between"><Label>Blur</Label><span className="text-xs text-muted-foreground">{layer.filters?.blur ?? 0}</span></div>
+          <Slider min={0} max={40} step={1} value={[layer.filters?.blur ?? 0]} onValueChange={(v) => patch({ filters: { ...layer.filters, blur: v[0] } } as Partial<ImageLayer>)} onValueCommit={commit} />
+        </div>
       </div>
     </div>
   );
@@ -349,6 +393,27 @@ function TextProps({
             className="h-8 p-1"
           />
         </div>
+      </div>
+      <div className="space-y-1">
+        <Label>Drop shadow</Label>
+        <Slider
+          min={0}
+          max={60}
+          step={1}
+          value={[layer.shadow?.blur ?? 0]}
+          onValueChange={(v) =>
+            patch({
+              shadow: {
+                blur: v[0],
+                offsetX: layer.shadow?.offsetX ?? 4,
+                offsetY: layer.shadow?.offsetY ?? 6,
+                color: layer.shadow?.color ?? "#000000",
+                opacity: layer.shadow?.opacity ?? 0.35,
+              },
+            } as Partial<TextLayer>)
+          }
+          onValueCommit={commit}
+        />
       </div>
     </div>
   );

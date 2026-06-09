@@ -6,7 +6,7 @@ export interface AlbumSize {
   preset: AlbumSizePreset;
 }
 
-export type MaskKind = "none" | "rounded" | "circle" | "heart";
+export type MaskKind = "none" | "rounded" | "circle" | "heart" | "star" | "hexagon" | "triangle";
 
 export interface ImageCrop {
   x: number; // 0-1
@@ -53,6 +53,13 @@ export interface ImageLayer extends LayerBase {
   flipV: boolean;
   border?: Border;
   shadow?: Shadow;
+  filters?: {
+    brightness?: number; // -1 to 1
+    contrast?: number; // -100 to 100
+    blur?: number; // 0 to 40
+    grayscale?: boolean;
+    sepia?: boolean;
+  };
 }
 
 export interface TextLayer extends LayerBase {

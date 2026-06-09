@@ -3,6 +3,7 @@ import type {
   Album,
   AlbumSizePreset,
   DecorationAsset,
+  ImageLayer,
   Layer,
   Page,
   PageBackground,
@@ -16,7 +17,11 @@ import {
   saveAlbum,
   saveDecorations,
   savePhotos,
+  loadCustomLayouts,
+  saveCustomLayouts,
 } from "@/lib/album-persistence";
+import { LAYOUTS, type AlbumLayout } from "@/lib/layouts";
+import { inToEditorPx } from "@/lib/units";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -60,6 +65,10 @@ interface State {
   fitMode: "fit" | "free";
   photos: PhotoAsset[];
   decorations: DecorationAsset[];
+  customLayouts: AlbumLayout[];
+  photoSort: "time" | "name";
+  showGuides: boolean;
+  layoutGap: number;
   history: HistoryEntry[];
   historyIndex: number;
 
@@ -76,6 +85,7 @@ interface State {
   movePage: (from: number, to: number) => void;
   setActivePage: (id: string) => void;
   updatePageBackground: (pageId: string, bg: PageBackground) => void;
+  updateAllPagesBackground: (bg: PageBackground) => void;
 
   // Layers
   addLayer: (pageId: string, layer: Layer) => void;
@@ -99,6 +109,16 @@ interface State {
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
+
+  // Features
+  applyLayoutToPage: (pageId: string, layout: AlbumLayout) => void;
+  autoFillAlbum: (photosToFill: PhotoAsset[]) => void;
+  savePageAsLayout: (pageId: string, name: string) => void;
+  addCustomLayout: (layout: AlbumLayout) => void;
+  deleteCustomLayout: (layoutId: string) => void;
+  setPhotoSort: (sort: "time" | "name") => void;
+  toggleGuides: () => void;
+  setLayoutGap: (gap: number) => void;
 }
 
 const HISTORY_LIMIT = 50;
@@ -112,14 +132,19 @@ export const useAlbumStore = create<State>((set, get) => ({
   fitMode: "fit",
   photos: [],
   decorations: [],
+  customLayouts: [],
+  photoSort: "time",
+  showGuides: false,
+  layoutGap: 16,
   history: [],
   historyIndex: -1,
 
   bootstrap: async () => {
-    const [album, photos, decorations] = await Promise.all([
+    const [album, photos, decorations, layouts] = await Promise.all([
       loadAlbum(),
       loadPhotos(),
       loadDecorations(),
+      loadCustomLayouts(),
     ]);
     const a = album ?? createBlankAlbum();
     set({
@@ -127,6 +152,7 @@ export const useAlbumStore = create<State>((set, get) => ({
       activePageId: a.pages[0]?.id ?? "",
       photos,
       decorations,
+      customLayouts: layouts,
       ready: true,
       history: [{ album: a }],
       historyIndex: 0,
@@ -208,6 +234,13 @@ export const useAlbumStore = create<State>((set, get) => ({
       pages: a.pages.map((p) => (p.id === pageId ? { ...p, background: bg } : p)),
     }));
   },
+  
+  updateAllPagesBackground: (bg) => {
+    get().setAlbum((a) => ({
+      ...a,
+      pages: a.pages.map((p) => ({ ...p, background: bg })),
+    }));
+  },
 
   addLayer: (pageId, layer) => {
     get().setAlbum((a) => ({
@@ -287,6 +320,216 @@ export const useAlbumStore = create<State>((set, get) => ({
   },
   canUndo: () => get().historyIndex > 0,
   canRedo: () => get().historyIndex < get().history.length - 1,
+
+  applyLayoutToPage: (pageId, layout) => {
+    get().setAlbum((a) => {
+      const pageIndex = a.pages.findIndex((p) => p.id === pageId);
+      if (pageIndex === -1) return a;
+      const page = a.pages[pageIndex];
+
+      const pageWpx = inToEditorPx(a.widthIn);
+      const pageHpx = inToEditorPx(a.heightIn);
+      const gap = get().layoutGap || 0;
+
+      const existingImages = page.layers.filter((l): l is ImageLayer => l.type === "image");
+      const otherLayers = page.layers.filter((l) => l.type !== "image");
+
+      const availablePhotos = get().photos;
+      const usedSrcs = new Set<string>();
+      a.pages.forEach((p) =>
+        p.layers.forEach((l) => {
+          if (l.type === "image") usedSrcs.add(l.src);
+        })
+      );
+      const unusedPhotos = availablePhotos.filter((p) => !usedSrcs.has(p.src));
+
+      const newLayers: Layer[] = [...otherLayers];
+
+      layout.slots.forEach((slot, i) => {
+        let photoSrc = "";
+        let naturalWidth = 1000;
+        let naturalHeight = 1000;
+        let name = `Slot ${i + 1}`;
+        let existingId = uid();
+        let border = undefined;
+
+        if (i < existingImages.length) {
+          photoSrc = existingImages[i].src;
+          naturalWidth = existingImages[i].naturalWidth;
+          naturalHeight = existingImages[i].naturalHeight;
+          name = existingImages[i].name;
+          existingId = existingImages[i].id;
+          border = existingImages[i].border;
+        } else if (unusedPhotos.length > 0) {
+          const nextPhoto = unusedPhotos.shift()!;
+          photoSrc = nextPhoto.src;
+          naturalWidth = nextPhoto.width;
+          naturalHeight = nextPhoto.height;
+          name = nextPhoto.name;
+          border = { width: 4, color: "#ffffff" };
+        } else if (availablePhotos.length > 0) {
+          const fallback = availablePhotos[i % availablePhotos.length];
+          photoSrc = fallback.src;
+          naturalWidth = fallback.width;
+          naturalHeight = fallback.height;
+          name = fallback.name;
+          border = { width: 4, color: "#ffffff" };
+        } else {
+          return; // No photo to fill this slot
+        }
+
+        const sw = slot.w * pageWpx;
+        const sh = slot.h * pageHpx;
+        const sx = slot.x * pageWpx;
+        const sy = slot.y * pageHpx;
+  
+        const fw = Math.max(10, sw - gap);
+        const fh = Math.max(10, sh - gap);
+        const fx = sx + gap / 2;
+        const fy = sy + gap / 2;
+
+        newLayers.push({
+          id: existingId,
+          name,
+          type: "image",
+          src: photoSrc,
+          naturalWidth,
+          naturalHeight,
+          x: fx,
+          y: fy,
+          width: fw,
+          height: fh,
+          rotation: 0,
+          opacity: 1,
+          visible: true,
+          locked: false,
+          mask: "none",
+          cornerRadius: 12,
+          flipH: false,
+          flipV: false,
+          border,
+        });
+      });
+
+      const nextPages = [...a.pages];
+      nextPages[pageIndex] = { ...page, layers: newLayers };
+      return { ...a, pages: nextPages };
+    });
+  },
+
+  autoFillAlbum: (photosToFill) => {
+    if (photosToFill.length === 0) return;
+
+    get().setAlbum((a) => {
+      const pageWpx = inToEditorPx(a.widthIn);
+      const pageHpx = inToEditorPx(a.heightIn);
+
+      const newPages: Page[] = [];
+      let i = 0;
+
+      const ALL_LAYOUTS = [...LAYOUTS, ...get().customLayouts];
+
+      while (i < photosToFill.length) {
+        const remaining = photosToFill.length - i;
+        let chunkSize = Math.floor(Math.random() * 4) + 3; // 3 to 6
+        if (remaining < 3) chunkSize = remaining;
+        if (chunkSize > remaining) chunkSize = remaining;
+
+        const chunk = photosToFill.slice(i, i + chunkSize);
+        i += chunkSize;
+
+        const categoryStr = chunkSize.toString();
+        const validLayouts = ALL_LAYOUTS.filter((l) => l.category === categoryStr);
+        let layout = validLayouts[Math.floor(Math.random() * validLayouts.length)];
+        if (!layout && ALL_LAYOUTS.length > 0) {
+          layout = ALL_LAYOUTS[0];
+        }
+
+        const page = createBlankPage();
+        const gap = get().layoutGap || 0;
+
+        if (layout) {
+          const layers: ImageLayer[] = chunk.map((photo, idx) => {
+            const slot = layout.slots[idx % layout.slots.length];
+            const sw = slot.w * pageWpx;
+            const sh = slot.h * pageHpx;
+            const sx = slot.x * pageWpx;
+            const sy = slot.y * pageHpx;
+      
+            const fw = Math.max(10, sw - gap);
+            const fh = Math.max(10, sh - gap);
+            const fx = sx + gap / 2;
+            const fy = sy + gap / 2;
+
+            return {
+              id: uid(),
+              name: photo.name,
+              type: "image",
+              src: photo.src,
+              naturalWidth: photo.width,
+              naturalHeight: photo.height,
+              x: fx,
+              y: fy,
+              width: fw,
+              height: fh,
+              rotation: 0,
+              opacity: 1,
+              visible: true,
+              locked: false,
+              mask: "none",
+              cornerRadius: 12,
+              flipH: false,
+              flipV: false,
+              border: { width: 4, color: "#ffffff" },
+            };
+          });
+          page.layers = layers;
+        }
+        newPages.push(page);
+      }
+
+      return { ...a, pages: [...a.pages, ...newPages] };
+    });
+    set((s) => ({ activePageId: s.album.pages[s.album.pages.length - 1]?.id || s.activePageId }));
+  },
+
+  savePageAsLayout: (pageId, name) => {
+    const { album, customLayouts } = get();
+    const page = album.pages.find((p) => p.id === pageId);
+    if (!page) return;
+
+    const images = page.layers.filter((l): l is ImageLayer => l.type === "image");
+    if (images.length === 0) return;
+
+    const pageWpx = inToEditorPx(album.widthIn);
+    const pageHpx = inToEditorPx(album.heightIn);
+
+    const slots = images.map((img) => ({
+      x: img.x / pageWpx,
+      y: img.y / pageHpx,
+      w: img.width / pageWpx,
+      h: img.height / pageHpx,
+    }));
+
+    let category = images.length.toString() as AlbumLayout["category"];
+    if (images.length > 6) category = "collage";
+
+    const layout: AlbumLayout = {
+      id: `custom-${uid()}`,
+      name: name || `Custom Layout (${images.length} photos)`,
+      category,
+      slots,
+    };
+
+    set({ customLayouts: [...customLayouts, layout] });
+  },
+
+  addCustomLayout: (layout) => set({ customLayouts: [...get().customLayouts, layout] }),
+  deleteCustomLayout: (id) => set({ customLayouts: get().customLayouts.filter((l) => l.id !== id) }),
+
+  setPhotoSort: (sort) => set({ photoSort: sort }),
+  toggleGuides: () => set((s) => ({ showGuides: !s.showGuides })),
+  setLayoutGap: (gap) => set({ layoutGap: gap }),
 }));
 
 function pushHistory(
@@ -305,9 +548,12 @@ function pushHistory(
 let albumTimer: ReturnType<typeof setTimeout> | null = null;
 let photoTimer: ReturnType<typeof setTimeout> | null = null;
 let decorTimer: ReturnType<typeof setTimeout> | null = null;
+let layoutsTimer: ReturnType<typeof setTimeout> | null = null;
 let lastAlbum: Album | null = null;
 let lastPhotos: PhotoAsset[] | null = null;
 let lastDecor: DecorationAsset[] | null = null;
+let lastLayouts: AlbumLayout[] | null = null;
+
 useAlbumStore.subscribe((s) => {
   if (!s.ready) return;
   if (s.album !== lastAlbum) {
@@ -324,5 +570,10 @@ useAlbumStore.subscribe((s) => {
     lastDecor = s.decorations;
     if (decorTimer) clearTimeout(decorTimer);
     decorTimer = setTimeout(() => void saveDecorations(s.decorations), 500);
+  }
+  if (s.customLayouts !== lastLayouts) {
+    lastLayouts = s.customLayouts;
+    if (layoutsTimer) clearTimeout(layoutsTimer);
+    layoutsTimer = setTimeout(() => void saveCustomLayouts(s.customLayouts), 500);
   }
 });

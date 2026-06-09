@@ -171,6 +171,21 @@ export default function BackgroundPanel() {
           </div>
         </div>
       )}
+
+      <div className="pt-4 border-t mt-4">
+        <Button 
+          variant="outline" 
+          className="w-full"
+          onClick={() => {
+            useAlbumStore.getState().updateAllPagesBackground(bg);
+          }}
+        >
+          Apply to All Pages
+        </Button>
+        <p className="text-[10px] text-muted-foreground text-center mt-2">
+          This will overwrite the background of every page in the album.
+        </p>
+      </div>
     </div>
   );
 }

@@ -17,6 +17,7 @@ export default function ImageLayerNode({ layer, pageId }: Props) {
   const selected = useAlbumStore((s) => s.selectedLayerIds);
   const setSelected = useAlbumStore((s) => s.setSelected);
   const ref = useRef<Konva.Group>(null);
+  const imageRef = useRef<Konva.Image>(null);
   const isSelected = selected.includes(layer.id);
 
   // Commit history on transform end
@@ -61,12 +62,59 @@ export default function ImageLayerNode({ layer, pageId }: Props) {
         ctx.closePath();
       };
     }
+    if (layer.mask === "triangle") {
+      return (ctx: CanvasRenderingContext2D) => {
+        ctx.beginPath();
+        ctx.moveTo(w / 2, 0);
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+      };
+    }
+    if (layer.mask === "hexagon") {
+      return (ctx: CanvasRenderingContext2D) => {
+        ctx.beginPath();
+        ctx.moveTo(w / 2, 0);
+        ctx.lineTo(w, h * 0.25);
+        ctx.lineTo(w, h * 0.75);
+        ctx.lineTo(w / 2, h);
+        ctx.lineTo(0, h * 0.75);
+        ctx.lineTo(0, h * 0.25);
+        ctx.closePath();
+      };
+    }
+    if (layer.mask === "star") {
+      return (ctx: CanvasRenderingContext2D) => {
+        const cx = w / 2;
+        const cy = h / 2;
+        const outerRadius = Math.min(w, h) / 2;
+        const innerRadius = outerRadius / 2;
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          ctx.lineTo(
+            cx + Math.cos((18 + i * 72) / 180 * Math.PI) * outerRadius,
+            cy - Math.sin((18 + i * 72) / 180 * Math.PI) * outerRadius
+          );
+          ctx.lineTo(
+            cx + Math.cos((54 + i * 72) / 180 * Math.PI) * innerRadius,
+            cy - Math.sin((54 + i * 72) / 180 * Math.PI) * innerRadius
+          );
+        }
+        ctx.closePath();
+      };
+    }
     return undefined;
   })();
 
+  const hasFilters = layer.filters && Object.keys(layer.filters).length > 0;
+  
   useEffect(() => {
-    // sync rotation/x/y in case of external updates
-  }, [layer]);
+    if (img && hasFilters) {
+      imageRef.current?.cache();
+    } else if (img && !hasFilters) {
+      imageRef.current?.clearCache();
+    }
+  }, [img, hasFilters, layer.filters, layer.width, layer.height, layer.crop, layer.flipH, layer.flipV]);
 
   if (!img) {
     return (
@@ -93,6 +141,13 @@ export default function ImageLayerNode({ layer, pageId }: Props) {
         cropHeight: layer.crop.h * img.height,
       }
     : {};
+
+  const activeFilters = [];
+  if (layer.filters?.brightness !== undefined) activeFilters.push(Konva.Filters.Brighten);
+  if (layer.filters?.contrast !== undefined) activeFilters.push(Konva.Filters.Contrast);
+  if (layer.filters?.blur !== undefined) activeFilters.push(Konva.Filters.Blur);
+  if (layer.filters?.grayscale) activeFilters.push(Konva.Filters.Grayscale);
+  if (layer.filters?.sepia) activeFilters.push(Konva.Filters.Sepia);
 
   return (
     <Group
@@ -144,10 +199,15 @@ export default function ImageLayerNode({ layer, pageId }: Props) {
           scaleY={flipScaleY}
         >
           <KonvaImage
+            ref={imageRef}
             image={img}
             width={layer.width}
             height={layer.height}
             {...crop}
+            filters={activeFilters.length > 0 ? activeFilters : undefined}
+            brightness={layer.filters?.brightness ?? 0}
+            contrast={layer.filters?.contrast ?? 0}
+            blurRadius={layer.filters?.blur ?? 0}
             shadowBlur={layer.shadow?.blur ?? 0}
             shadowOffsetX={layer.shadow?.offsetX ?? 0}
             shadowOffsetY={layer.shadow?.offsetY ?? 0}

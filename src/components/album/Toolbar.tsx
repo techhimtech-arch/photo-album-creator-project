@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ALBUM_PRESETS, type AlbumSizePreset } from "@/types/album";
-import { Undo2, Redo2, Download, Maximize2, Plus, MoreVertical, FilePlus2 } from "lucide-react";
+import { Undo2, Redo2, Download, Maximize2, Plus, MoreVertical, FilePlus2, Ruler } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
@@ -39,6 +39,8 @@ export default function Toolbar() {
   const canUndo = useAlbumStore((s) => s.canUndo());
   const canRedo = useAlbumStore((s) => s.canRedo());
   const newAlbum = useAlbumStore((s) => s.newAlbum);
+  const showGuides = useAlbumStore((s) => s.showGuides);
+  const toggleGuides = useAlbumStore((s) => s.toggleGuides);
   const [customW, setCustomW] = useState(album.widthIn);
   const [customH, setCustomH] = useState(album.heightIn);
   const [customOpen, setCustomOpen] = useState(false);
@@ -137,6 +139,16 @@ export default function Toolbar() {
 
       <Button variant="ghost" size="icon" onClick={onFullscreen} title="Fullscreen">
         <Maximize2 className="h-4 w-4" />
+      </Button>
+
+      <Button
+        variant={showGuides ? "secondary" : "ghost"}
+        size="sm"
+        onClick={toggleGuides}
+        title="Toggle Print Guides (Bleed & Safe Area)"
+      >
+        <Ruler className="h-4 w-4 mr-2" />
+        Guides
       </Button>
 
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>

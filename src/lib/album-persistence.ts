@@ -1,9 +1,11 @@
 import { get, set, del } from "idb-keyval";
 import type { Album, PhotoAsset, DecorationAsset } from "@/types/album";
+import type { AlbumLayout } from "@/lib/layouts";
 
 const ALBUM_KEY = "wedding-album-designer:album:v1";
 const PHOTOS_KEY = "wedding-album-designer:photos:v1";
 const DECOR_KEY = "wedding-album-designer:decorations:v1";
+const LAYOUTS_KEY = "wedding-album-designer:layouts:v1";
 
 export async function loadAlbum(): Promise<Album | null> {
   try {
@@ -39,6 +41,17 @@ export async function loadDecorations(): Promise<DecorationAsset[]> {
 }
 export async function saveDecorations(d: DecorationAsset[]): Promise<void> {
   await set(DECOR_KEY, d);
+}
+
+export async function loadCustomLayouts(): Promise<AlbumLayout[]> {
+  try {
+    return (await get<AlbumLayout[]>(LAYOUTS_KEY)) ?? [];
+  } catch {
+    return [];
+  }
+}
+export async function saveCustomLayouts(layouts: AlbumLayout[]): Promise<void> {
+  await set(LAYOUTS_KEY, layouts);
 }
 
 export async function getStorageEstimate(): Promise<{ usageMB: number; quotaMB: number } | null> {

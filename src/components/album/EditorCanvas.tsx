@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Stage, Layer, Rect, Group } from "react-konva";
+import { Stage, Layer, Rect, Group, Line, Transformer as KonvaTransformer } from "react-konva";
 import Konva from "konva";
 import { useAlbumStore } from "@/lib/album-store";
 import { inToEditorPx } from "@/lib/units";
@@ -8,12 +8,15 @@ import PageBackgroundNode from "./layers/PageBackgroundNode";
 import ImageLayerNode from "./layers/ImageLayerNode";
 import TextLayerNode from "./layers/TextLayerNode";
 import DecorationLayerNode from "./layers/DecorationLayerNode";
+import { getSnapLines } from "@/lib/snapping";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
 export default function EditorCanvas() {
   const album = useAlbumStore((s) => s.album);
   const activePageId = useAlbumStore((s) => s.activePageId);
   const zoom = useAlbumStore((s) => s.zoom);
   const fitMode = useAlbumStore((s) => s.fitMode);
+  const showGuides = useAlbumStore((s) => s.showGuides);
   const setZoom = useAlbumStore((s) => s.setZoom);
   const setFitMode = useAlbumStore((s) => s.setFitMode);
   const setSelected = useAlbumStore((s) => s.setSelected);
@@ -23,6 +26,9 @@ export default function EditorCanvas() {
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [snapLines, setSnapLines] = useState<{ xLine?: number; yLine?: number; type: "h" | "v"; length: number }[]>([]);
+
+  useKeyboardShortcuts();
 
   const page: Page | undefined = album.pages.find((p) => p.id === activePageId);
 
@@ -65,6 +71,9 @@ export default function EditorCanvas() {
   const offsetX = (stageW - pageW * scale) / 2;
   const offsetY = (stageH - pageH * scale) / 2;
 
+  const bleedPx = inToEditorPx(0.125);
+  const safePx = inToEditorPx(0.375);
+
   return (
     <div ref={wrapRef} className="relative flex-1 overflow-hidden bg-muted/30" data-canvas-wrap>
       <Stage
@@ -81,6 +90,18 @@ export default function EditorCanvas() {
           e.evt.preventDefault();
           const delta = -e.evt.deltaY * 0.001;
           setZoom(scale + delta);
+        }}
+        onDragMove={(e) => {
+          const node = e.target;
+          if (node.name() === "page-bg" || node.className === "Transformer" || node.name() === "_anchor") {
+            setSnapLines([]);
+            return;
+          }
+          const lines = getSnapLines(node, pageW, pageH, [], 5 / scale);
+          setSnapLines(lines);
+        }}
+        onDragEnd={() => {
+          setSnapLines([]);
         }}
       >
         <Layer x={offsetX} y={offsetY} scaleX={scale} scaleY={scale} listening={false}>
@@ -115,6 +136,31 @@ export default function EditorCanvas() {
               return null;
             })}
           </Group>
+
+          {/* Print Guides */}
+          {showGuides && (
+            <Group listening={false}>
+              <Rect
+                x={bleedPx}
+                y={bleedPx}
+                width={pageW - bleedPx * 2}
+                height={pageH - bleedPx * 2}
+                stroke="red"
+                strokeWidth={1.5 / scale}
+                dash={[5 / scale, 5 / scale]}
+              />
+              <Rect
+                x={safePx}
+                y={safePx}
+                width={pageW - safePx * 2}
+                height={pageH - safePx * 2}
+                stroke="#3b82f6"
+                strokeWidth={1.5 / scale}
+                dash={[5 / scale, 5 / scale]}
+              />
+            </Group>
+          )}
+
           {/* Page border */}
           <Rect
             x={0}
@@ -125,7 +171,24 @@ export default function EditorCanvas() {
             strokeWidth={1 / scale}
             listening={false}
           />
+          
           <KonvaTransformerRef trRef={trRef} />
+
+          {/* Snap Guides */}
+          {snapLines.map((l, i) => (
+            <Line
+              key={i}
+              points={
+                l.type === "v"
+                  ? [l.xLine!, 0, l.xLine!, l.length]
+                  : [0, l.yLine!, l.length, l.yLine!]
+              }
+              stroke="#e81123" // Magenta-ish red for snap
+              strokeWidth={1 / scale}
+              dash={[4 / scale, 4 / scale]}
+              listening={false}
+            />
+          ))}
         </Layer>
       </Stage>
 
@@ -164,5 +227,3 @@ function KonvaTransformerRef({ trRef }: { trRef: React.RefObject<Konva.Transform
     />
   );
 }
-
-import { Transformer as KonvaTransformer } from "react-konva";
