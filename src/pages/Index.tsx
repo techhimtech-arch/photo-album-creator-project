@@ -1,53 +1,65 @@
-import { useEffect, useState } from "react";
-import { useIdStore } from "@/lib/idcard-store";
-import Stepper from "@/components/idcard/Stepper";
-import StepUpload from "@/components/idcard/StepUpload";
-import StepMapping from "@/components/idcard/StepMapping";
-import StepReview from "@/components/idcard/StepReview";
-import StepDesign from "@/components/idcard/StepDesign";
-import StepExport from "@/components/idcard/StepExport";
-import { loadState } from "@/lib/persistence";
-import { toast } from "@/hooks/use-toast";
+import { useEffect } from "react";
+import { useAlbumStore } from "@/lib/album-store";
+import Toolbar from "@/components/album/Toolbar";
+import PageSidebar from "@/components/album/PageSidebar";
+import EditorCanvas from "@/components/album/EditorCanvas";
+import RightPanel from "@/components/album/RightPanel";
+import { preloadWeddingFonts } from "@/lib/fonts";
 
 const Index = () => {
-  const step = useIdStore((s) => s.step);
-  const hydrate = useIdStore((s) => s.hydrate);
-  const [ready, setReady] = useState(false);
+  const ready = useAlbumStore((s) => s.ready);
+  const bootstrap = useAlbumStore((s) => s.bootstrap);
+  const undo = useAlbumStore((s) => s.undo);
+  const redo = useAlbumStore((s) => s.redo);
+  const deleteLayer = useAlbumStore((s) => s.deleteLayer);
+  const setAlbum = useAlbumStore((s) => s.setAlbum);
 
   useEffect(() => {
-    let mounted = true;
-    loadState().then((s) => {
-      if (!mounted) return;
-      if (s && s.rows.length > 0) {
-        hydrate(s);
-        toast({
-          title: "Previous session restored",
-          description: `${s.rows.length} students · ${s.photos.length} photos loaded.`,
-        });
+    void bootstrap();
+    preloadWeddingFonts();
+  }, [bootstrap]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
       }
-      setReady(true);
-    });
-    return () => {
-      mounted = false;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        const s = useAlbumStore.getState();
+        if (s.selectedLayerIds.length) {
+          for (const id of s.selectedLayerIds) deleteLayer(s.activePageId, id);
+          setAlbum((a) => ({ ...a }), true);
+        }
+      }
     };
-  }, [hydrate]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo, deleteLayer, setAlbum]);
 
   if (!ready) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">Loading…</div>;
+    return (
+      <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">
+        Loading editor…
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen flex bg-background">
-      <Stepper />
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto p-8">
-          {step === 0 && <StepUpload />}
-          {step === 1 && <StepMapping />}
-          {step === 2 && <StepReview />}
-          {step === 3 && <StepDesign />}
-          {step === 4 && <StepExport />}
-        </div>
-      </main>
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
+      <Toolbar />
+      <div className="flex flex-1 overflow-hidden">
+        <PageSidebar />
+        <EditorCanvas />
+        <RightPanel />
+      </div>
     </div>
   );
 };

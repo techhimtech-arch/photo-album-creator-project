@@ -1,0 +1,168 @@
+import { useEffect, useRef, useState } from "react";
+import { Stage, Layer, Rect, Group } from "react-konva";
+import Konva from "konva";
+import { useAlbumStore } from "@/lib/album-store";
+import { inToEditorPx } from "@/lib/units";
+import type { Page } from "@/types/album";
+import PageBackgroundNode from "./layers/PageBackgroundNode";
+import ImageLayerNode from "./layers/ImageLayerNode";
+import TextLayerNode from "./layers/TextLayerNode";
+import DecorationLayerNode from "./layers/DecorationLayerNode";
+
+export default function EditorCanvas() {
+  const album = useAlbumStore((s) => s.album);
+  const activePageId = useAlbumStore((s) => s.activePageId);
+  const zoom = useAlbumStore((s) => s.zoom);
+  const fitMode = useAlbumStore((s) => s.fitMode);
+  const setZoom = useAlbumStore((s) => s.setZoom);
+  const setFitMode = useAlbumStore((s) => s.setFitMode);
+  const setSelected = useAlbumStore((s) => s.setSelected);
+  const selected = useAlbumStore((s) => s.selectedLayerIds);
+
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<Konva.Stage>(null);
+  const trRef = useRef<Konva.Transformer>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+
+  const page: Page | undefined = album.pages.find((p) => p.id === activePageId);
+
+  const pageW = inToEditorPx(album.widthIn);
+  const pageH = inToEditorPx(album.heightIn);
+
+  // Resize observer
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const ro = new ResizeObserver(() => {
+      const r = wrapRef.current!.getBoundingClientRect();
+      setSize({ w: r.width, h: r.height });
+    });
+    ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  // Auto-fit zoom
+  const fitScale = size.w && size.h
+    ? Math.min((size.w - 80) / pageW, (size.h - 80) / pageH, 4)
+    : 1;
+  const scale = fitMode === "fit" ? fitScale : zoom;
+
+  // Update transformer when selection changes
+  useEffect(() => {
+    const tr = trRef.current;
+    const stage = stageRef.current;
+    if (!tr || !stage) return;
+    const nodes = selected
+      .map((id) => stage.findOne(`#${id}`))
+      .filter(Boolean) as Konva.Node[];
+    tr.nodes(nodes);
+    tr.getLayer()?.batchDraw();
+  }, [selected, activePageId, album]);
+
+  if (!page) return <div className="flex-1 grid place-items-center text-muted-foreground">No page</div>;
+
+  const stageW = size.w || 800;
+  const stageH = size.h || 600;
+  const offsetX = (stageW - pageW * scale) / 2;
+  const offsetY = (stageH - pageH * scale) / 2;
+
+  return (
+    <div ref={wrapRef} className="relative flex-1 overflow-hidden bg-muted/30" data-canvas-wrap>
+      <Stage
+        ref={stageRef}
+        width={stageW}
+        height={stageH}
+        onMouseDown={(e) => {
+          // click on empty area to deselect
+          if (e.target === e.target.getStage()) setSelected([]);
+          if (e.target.attrs?.name === "page-bg") setSelected([]);
+        }}
+        onWheel={(e) => {
+          if (!e.evt.ctrlKey && !e.evt.metaKey) return;
+          e.evt.preventDefault();
+          const delta = -e.evt.deltaY * 0.001;
+          setZoom(scale + delta);
+        }}
+      >
+        <Layer x={offsetX} y={offsetY} scaleX={scale} scaleY={scale} listening={false}>
+          {/* Page shadow */}
+          <Rect
+            x={6}
+            y={8}
+            width={pageW}
+            height={pageH}
+            fill="rgba(0,0,0,0.2)"
+            shadowBlur={20}
+            listening={false}
+          />
+        </Layer>
+
+        <Layer x={offsetX} y={offsetY} scaleX={scale} scaleY={scale}>
+          <Group
+            clipX={0}
+            clipY={0}
+            clipWidth={pageW}
+            clipHeight={pageH}
+          >
+            <PageBackgroundNode background={page.background} width={pageW} height={pageH} />
+            {page.layers.map((layer) => {
+              if (!layer.visible) return null;
+              if (layer.type === "image")
+                return <ImageLayerNode key={layer.id} layer={layer} pageId={page.id} />;
+              if (layer.type === "text")
+                return <TextLayerNode key={layer.id} layer={layer} pageId={page.id} />;
+              if (layer.type === "decoration")
+                return <DecorationLayerNode key={layer.id} layer={layer} pageId={page.id} />;
+              return null;
+            })}
+          </Group>
+          {/* Page border */}
+          <Rect
+            x={0}
+            y={0}
+            width={pageW}
+            height={pageH}
+            stroke="rgba(0,0,0,0.15)"
+            strokeWidth={1 / scale}
+            listening={false}
+          />
+          <KonvaTransformerRef trRef={trRef} />
+        </Layer>
+      </Stage>
+
+      <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-md border bg-card/95 px-2 py-1 text-xs shadow-sm backdrop-blur">
+        <button className="px-2 py-0.5 hover:bg-accent rounded" onClick={() => setFitMode("fit")}>
+          Fit
+        </button>
+        <button
+          className="px-2 py-0.5 hover:bg-accent rounded"
+          onClick={() => setZoom(Math.max(0.05, scale - 0.1))}
+        >
+          −
+        </button>
+        <span className="w-12 text-center tabular-nums">{Math.round(scale * 100)}%</span>
+        <button
+          className="px-2 py-0.5 hover:bg-accent rounded"
+          onClick={() => setZoom(scale + 0.1)}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KonvaTransformerRef({ trRef }: { trRef: React.RefObject<Konva.Transformer | null> }) {
+  return (
+    <KonvaTransformer
+      ref={trRef as React.RefObject<Konva.Transformer>}
+      rotateEnabled
+      keepRatio={false}
+      borderStroke="#3b82f6"
+      anchorStroke="#3b82f6"
+      anchorFill="#fff"
+      anchorSize={8}
+    />
+  );
+}
+
+import { Transformer as KonvaTransformer } from "react-konva";
