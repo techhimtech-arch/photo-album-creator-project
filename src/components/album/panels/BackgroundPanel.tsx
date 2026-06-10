@@ -143,6 +143,31 @@ export default function BackgroundPanel() {
           {bg.src && (
             <img src={bg.src} alt="" className="w-full rounded border object-cover max-h-32" />
           )}
+
+          <div className="pt-2">
+            <Label className="mb-2 block">Premium Library</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: "Floral", url: "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?q=80&w=300&auto=format&fit=crop" },
+                { name: "Royal", url: "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?q=80&w=300&auto=format&fit=crop" },
+                { name: "Bokeh", url: "https://images.unsplash.com/photo-1543857778-c4a1a3e0b2eb?q=80&w=300&auto=format&fit=crop" },
+                { name: "Dark Luxury", url: "https://images.unsplash.com/photo-1600164318680-a61a9ba22f47?q=80&w=300&auto=format&fit=crop" },
+                { name: "Soft Pink", url: "https://images.unsplash.com/photo-1621619856624-42fd193a0661?q=80&w=300&auto=format&fit=crop" },
+                { name: "Vintage", url: "https://images.unsplash.com/photo-1586075010923-2dd4570fb338?q=80&w=300&auto=format&fit=crop" }
+              ].map((preset) => (
+                <div 
+                  key={preset.name}
+                  className="aspect-video relative rounded overflow-hidden cursor-pointer border hover:border-primary"
+                  onClick={() => set({ ...bg, src: preset.url, fit: "cover", opacity: 1 })}
+                >
+                  <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[10px] text-white px-1 py-0.5 truncate">
+                    {preset.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="space-y-1">
             <Label>Fit</Label>
             <Select value={bg.fit} onValueChange={(v) => set({ ...bg, fit: v as never })}>

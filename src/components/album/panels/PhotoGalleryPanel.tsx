@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useAlbumStore } from "@/lib/album-store";
 import { Button } from "@/components/ui/button";
 import { Upload, FolderOpen, X, Wand2 } from "lucide-react";
@@ -84,7 +84,16 @@ export default function PhotoGalleryPanel() {
     addLayer(activePageId, layer);
   };
 
-  const photos = [...rawPhotos].sort((a, b) => {
+  const [filter, setFilter] = useState<"all" | "unused">("unused");
+
+  const usedSrcs = new Set<string>();
+  album.pages.forEach((p) =>
+    p.layers.forEach((l) => {
+      if (l.type === "image") usedSrcs.add(l.src);
+    })
+  );
+
+  const photos = [...rawPhotos].filter((p) => filter === "all" || !usedSrcs.has(p.src)).sort((a, b) => {
     if (photoSort === "name") {
       return a.name.localeCompare(b.name);
     }
@@ -128,15 +137,26 @@ export default function PhotoGalleryPanel() {
       
       {photos.length > 0 && (
         <div className="px-2 pb-2 space-y-2">
-          <Select value={photoSort} onValueChange={(v) => setPhotoSort(v as "time" | "name")}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Sort By" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="time" className="text-xs">Sort by Time (Newest)</SelectItem>
-              <SelectItem value="name" className="text-xs">Sort by Name (A-Z)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select value={photoSort} onValueChange={(v) => setPhotoSort(v as "time" | "name")}>
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Sort By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="time" className="text-xs">Newest</SelectItem>
+                <SelectItem value="name" className="text-xs">A-Z</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filter} onValueChange={(v) => setFilter(v as "all" | "unused")}>
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unused" className="text-xs">Unused Queue</SelectItem>
+                <SelectItem value="all" className="text-xs">All Photos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           
           <Button 
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" 
@@ -174,6 +194,15 @@ export default function PhotoGalleryPanel() {
                 title={`Click to add to page`}
               >
                 <img src={p.src} alt={p.name} className="h-full w-full object-cover" />
+                {usedSrcs.has(p.src) && (
+                  <div className="absolute inset-0 bg-white/40 flex items-center justify-center">
+                    <div className="bg-green-600 text-white rounded-full p-1 shadow-sm">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

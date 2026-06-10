@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ALBUM_PRESETS, type AlbumSizePreset } from "@/types/album";
-import { Undo2, Redo2, Download, Maximize2, Plus, MoreVertical, FilePlus2, Ruler } from "lucide-react";
+import { Undo2, Redo2, Download, Maximize2, Plus, MoreVertical, FilePlus2, Ruler, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
@@ -41,6 +41,10 @@ export default function Toolbar() {
   const newAlbum = useAlbumStore((s) => s.newAlbum);
   const showGuides = useAlbumStore((s) => s.showGuides);
   const toggleGuides = useAlbumStore((s) => s.toggleGuides);
+  const activePageId = useAlbumStore((s) => s.activePageId);
+  const setPageStatus = useAlbumStore((s) => s.setPageStatus);
+  const activePage = album.pages.find((p) => p.id === activePageId);
+  
   const [customW, setCustomW] = useState(album.widthIn);
   const [customH, setCustomH] = useState(album.heightIn);
   const [customOpen, setCustomOpen] = useState(false);
@@ -150,6 +154,18 @@ export default function Toolbar() {
         <Ruler className="h-4 w-4 mr-2" />
         Guides
       </Button>
+
+      {activePage && (
+        <Button
+          variant={activePage.status === "done" ? "default" : "outline"}
+          size="sm"
+          className="mr-2"
+          onClick={() => setPageStatus(activePage.id, activePage.status === "done" ? "draft" : "done")}
+        >
+          <CheckCircle2 className="h-4 w-4 mr-2" />
+          {activePage.status === "done" ? "Done" : "Mark as Done"}
+        </Button>
+      )}
 
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
         <DialogTrigger asChild>

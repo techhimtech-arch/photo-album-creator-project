@@ -39,6 +39,7 @@ export interface LayerBase {
   opacity: number; // 0-1
   visible: boolean;
   locked: boolean;
+  isTemplate?: boolean;
 }
 
 export interface ImageLayer extends LayerBase {
@@ -116,6 +117,7 @@ export interface Page {
   id: string;
   background: PageBackground;
   layers: Layer[];
+  status?: "draft" | "done";
 }
 
 export interface Album {

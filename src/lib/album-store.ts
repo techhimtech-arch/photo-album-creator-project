@@ -84,6 +84,7 @@ interface State {
   deletePage: (pageId: string) => void;
   movePage: (from: number, to: number) => void;
   setActivePage: (id: string) => void;
+  setPageStatus: (pageId: string, status: "draft" | "done") => void;
   updatePageBackground: (pageId: string, bg: PageBackground) => void;
   updateAllPagesBackground: (bg: PageBackground) => void;
 
@@ -228,6 +229,13 @@ export const useAlbumStore = create<State>((set, get) => ({
   },
   setActivePage: (id) => set({ activePageId: id, selectedLayerIds: [] }),
 
+  setPageStatus: (pageId, status) => {
+    get().setAlbum((a) => ({
+      ...a,
+      pages: a.pages.map((p) => (p.id === pageId ? { ...p, status } : p)),
+    }));
+  },
+
   updatePageBackground: (pageId, bg) => {
     get().setAlbum((a) => ({
       ...a,
@@ -332,7 +340,7 @@ export const useAlbumStore = create<State>((set, get) => ({
       const gap = get().layoutGap || 0;
 
       const existingImages = page.layers.filter((l): l is ImageLayer => l.type === "image");
-      const otherLayers = page.layers.filter((l) => l.type !== "image");
+      const otherLayers = page.layers.filter((l) => l.type !== "image" && !l.isTemplate);
 
       const availablePhotos = get().photos;
       const usedSrcs = new Set<string>();
@@ -411,8 +419,27 @@ export const useAlbumStore = create<State>((set, get) => ({
         });
       });
 
+      if (layout.elements) {
+        layout.elements.forEach((el) => {
+          const { rx, ry, rw, rh, ...rest } = el as any;
+          newLayers.push({
+            ...rest,
+            id: uid(),
+            x: rx * pageWpx,
+            y: ry * pageHpx,
+            width: rw * pageWpx,
+            height: rh * pageHpx,
+            isTemplate: true,
+          } as Layer);
+        });
+      }
+
       const nextPages = [...a.pages];
-      nextPages[pageIndex] = { ...page, layers: newLayers };
+      const newPage = { ...page, layers: newLayers };
+      if (layout.background) {
+        newPage.background = layout.background;
+      }
+      nextPages[pageIndex] = newPage;
       return { ...a, pages: nextPages };
     });
   },
@@ -449,7 +476,7 @@ export const useAlbumStore = create<State>((set, get) => ({
         const gap = get().layoutGap || 0;
 
         if (layout) {
-          const layers: ImageLayer[] = chunk.map((photo, idx) => {
+          const layers: Layer[] = chunk.map((photo, idx) => {
             const slot = layout.slots[idx % layout.slots.length];
             const sw = slot.w * pageWpx;
             const sh = slot.h * pageHpx;
@@ -483,7 +510,26 @@ export const useAlbumStore = create<State>((set, get) => ({
               border: { width: 4, color: "#ffffff" },
             };
           });
+
+          if (layout.elements) {
+            layout.elements.forEach((el) => {
+              const { rx, ry, rw, rh, ...rest } = el as any;
+              layers.push({
+                ...rest,
+                id: uid(),
+                x: rx * pageWpx,
+                y: ry * pageHpx,
+                width: rw * pageWpx,
+                height: rh * pageHpx,
+                isTemplate: true,
+              } as Layer);
+            });
+          }
+
           page.layers = layers;
+          if (layout.background) {
+            page.background = layout.background;
+          }
         }
         newPages.push(page);
       }
@@ -514,11 +560,26 @@ export const useAlbumStore = create<State>((set, get) => ({
     let category = images.length.toString() as AlbumLayout["category"];
     if (images.length > 6) category = "collage";
 
+    const elements = page.layers
+      .filter((l) => l.type === "text" || l.type === "decoration")
+      .map((l) => {
+        const { id, x, y, width, height, ...rest } = l as any;
+        return {
+          ...rest,
+          rx: l.x / pageWpx,
+          ry: l.y / pageHpx,
+          rw: l.width / pageWpx,
+          rh: l.height / pageHpx,
+        };
+      });
+
     const layout: AlbumLayout = {
       id: `custom-${uid()}`,
       name: name || `Custom Layout (${images.length} photos)`,
       category,
       slots,
+      elements: elements.length > 0 ? elements : undefined,
+      background: page.background,
     };
 
     set({ customLayouts: [...customLayouts, layout] });

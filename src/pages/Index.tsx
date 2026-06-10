@@ -39,6 +39,28 @@ const Index = () => {
           setAlbum((a) => ({ ...a }), true);
         }
       }
+      if (e.code === "Space") {
+        e.preventDefault();
+        const s = useAlbumStore.getState();
+        const page = s.album.pages.find((p) => p.id === s.activePageId);
+        if (!page) return;
+        const images = page.layers.filter((l) => l.type === "image");
+        if (images.length === 0) return;
+        
+        let category = images.length.toString();
+        if (images.length > 6) category = "collage";
+        
+        // Import LAYOUTS dynamically or from store if available.
+        // Actually we need LAYOUTS from @/lib/layouts. Let's do it cleanly:
+        import("@/lib/layouts").then(({ LAYOUTS }) => {
+          const ALL_LAYOUTS = [...LAYOUTS, ...s.customLayouts];
+          const validLayouts = ALL_LAYOUTS.filter((l) => l.category === category);
+          if (validLayouts.length > 0) {
+            const randomLayout = validLayouts[Math.floor(Math.random() * validLayouts.length)];
+            s.applyLayoutToPage(s.activePageId, randomLayout);
+          }
+        });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

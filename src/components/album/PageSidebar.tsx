@@ -1,6 +1,6 @@
 import { useAlbumStore } from "@/lib/album-store";
 import { Button } from "@/components/ui/button";
-import { Plus, Copy, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Copy, Trash2, ChevronUp, ChevronDown, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function PageSidebar() {
@@ -46,6 +46,11 @@ export default function PageSidebar() {
                       : "#f3f4f6",
               }}
             />
+            {p.status === "done" && (
+              <div className="absolute top-1 left-1 bg-white/90 rounded-full text-green-600 shadow-sm">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+            )}
             <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
               <span>Page {i + 1}</span>
               <span className="opacity-70">{p.layers.length}L</span>

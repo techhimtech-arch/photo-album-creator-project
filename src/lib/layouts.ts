@@ -5,11 +5,26 @@ export interface LayoutSlot {
   w: number;
   h: number;
 }
+
+import type { TextLayer, DecorationLayer, PageBackground } from "@/types/album";
+
+export type TemplateElement = (
+  | Omit<TextLayer, "id" | "x" | "y" | "width" | "height">
+  | Omit<DecorationLayer, "id" | "x" | "y" | "width" | "height">
+) & {
+  rx: number; // relative x (0-1)
+  ry: number; // relative y (0-1)
+  rw: number; // relative width (0-1)
+  rh: number; // relative height (0-1)
+};
+
 export interface AlbumLayout {
   id: string;
   name: string;
   category: "1" | "2" | "3" | "4" | "5" | "6" | "collage";
   slots: LayoutSlot[];
+  elements?: TemplateElement[];
+  background?: PageBackground;
   aspectHint?: "landscape" | "portrait" | "any";
 }
 
