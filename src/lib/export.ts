@@ -119,12 +119,43 @@ async function addLayerToRoot(root: Konva.Group, l: Layer) {
       });
       const clipFunc = makeClip(l.mask, l.width, l.height, l.cornerRadius);
       const clipped = new Konva.Group({ clipFunc: clipFunc as never });
-      const crop = l.crop ? {
-        cropX: l.crop.x * img.width, cropY: l.crop.y * img.height,
-        cropWidth: l.crop.w * img.width, cropHeight: l.crop.h * img.height,
-      } : {};
+      let srcW = img.width;
+      let srcH = img.height;
+      let srcX = 0;
+      let srcY = 0;
+
+      if (l.crop) {
+        srcW = l.crop.w * img.width;
+        srcH = l.crop.h * img.height;
+        srcX = l.crop.x * img.width;
+        srcY = l.crop.y * img.height;
+      }
+
+      const layerAspect = l.width / l.height;
+      const srcAspect = srcW / srcH;
+
+      let drawCropW = srcW;
+      let drawCropH = srcH;
+      let drawCropX = 0;
+      let drawCropY = 0;
+
+      if (srcAspect > layerAspect) {
+        drawCropW = srcH * layerAspect;
+        drawCropX = (srcW - drawCropW) / 2;
+      } else {
+        drawCropH = srcW / layerAspect;
+        drawCropY = (srcH - drawCropH) / 2;
+      }
+
+      const finalCrop = {
+        cropX: srcX + drawCropX,
+        cropY: srcY + drawCropY,
+        cropWidth: drawCropW,
+        cropHeight: drawCropH,
+      };
+
       clipped.add(new Konva.Image({
-        image: img, width: l.width, height: l.height, ...crop,
+        image: img, width: l.width, height: l.height, ...finalCrop,
         shadowBlur: l.shadow?.blur ?? 0,
         shadowOffsetX: l.shadow?.offsetX ?? 0,
         shadowOffsetY: l.shadow?.offsetY ?? 0,

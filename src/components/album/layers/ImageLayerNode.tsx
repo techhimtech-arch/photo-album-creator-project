@@ -133,14 +133,40 @@ export default function ImageLayerNode({ layer, pageId }: Props) {
   const flipScaleX = layer.flipH ? -1 : 1;
   const flipScaleY = layer.flipV ? -1 : 1;
 
-  const crop = layer.crop
-    ? {
-        cropX: layer.crop.x * img.width,
-        cropY: layer.crop.y * img.height,
-        cropWidth: layer.crop.w * img.width,
-        cropHeight: layer.crop.h * img.height,
-      }
-    : {};
+  let srcW = img.width;
+  let srcH = img.height;
+  let srcX = 0;
+  let srcY = 0;
+
+  if (layer.crop) {
+    srcW = layer.crop.w * img.width;
+    srcH = layer.crop.h * img.height;
+    srcX = layer.crop.x * img.width;
+    srcY = layer.crop.y * img.height;
+  }
+
+  const layerAspect = layer.width / layer.height;
+  const srcAspect = srcW / srcH;
+
+  let drawCropW = srcW;
+  let drawCropH = srcH;
+  let drawCropX = 0;
+  let drawCropY = 0;
+
+  if (srcAspect > layerAspect) {
+    drawCropW = srcH * layerAspect;
+    drawCropX = (srcW - drawCropW) / 2;
+  } else {
+    drawCropH = srcW / layerAspect;
+    drawCropY = (srcH - drawCropH) / 2;
+  }
+
+  const finalCrop = {
+    cropX: srcX + drawCropX,
+    cropY: srcY + drawCropY,
+    cropWidth: drawCropW,
+    cropHeight: drawCropH,
+  };
 
   const activeFilters = [];
   if (layer.filters?.brightness !== undefined) activeFilters.push(Konva.Filters.Brighten);
@@ -203,7 +229,7 @@ export default function ImageLayerNode({ layer, pageId }: Props) {
             image={img}
             width={layer.width}
             height={layer.height}
-            {...crop}
+            {...finalCrop}
             filters={activeFilters.length > 0 ? activeFilters : undefined}
             brightness={layer.filters?.brightness ?? 0}
             contrast={layer.filters?.contrast ?? 0}
