@@ -56,7 +56,16 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "canvas": path.resolve(__dirname, "./src/mock-canvas.ts"),
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
+  optimizeDeps: {
+    exclude: ['canvas']
+  },
+  build: {
+    rollupOptions: {
+      external: ['canvas']
+    }
+  }
 }));

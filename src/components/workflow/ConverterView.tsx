@@ -1,15 +1,12 @@
 import { useRef, useState } from "react";
 import { useAlbumStore } from "@/lib/album-store";
-import {
-  parsePsdFile,
-  buildTemplateFromPsdPages,
-  type PsdParseResult,
-} from "@/lib/psd-import";
+import { parsePsdFile, buildTemplateFromPsdPages, type PsdParseResult } from "@/lib/psd-import";
 import { downloadTemplateJson } from "@/lib/album-template";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, Download, Save, Trash2, FileImage } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Upload, Download, Save, Trash2, FileImage, Sparkles, Layers, Image as ImageIcon, Type } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { Page } from "@/types/album";
 
@@ -48,10 +45,26 @@ export default function ConverterView() {
     setLoading(false);
   };
 
+  const toggleLayerIncluded = (pageIdx: number, layerId: string) => {
+    setParsedPages(prev => {
+      const next = [...prev];
+      const p = { ...next[pageIdx] };
+      p.layers = p.layers.map(l => l.id === layerId ? { ...l, included: !l.included } : l);
+      next[pageIdx] = p;
+      return next;
+    });
+  };
+
   const buildTemplate = () => {
     if (!parsedPages.length) return null;
     const first = parsedPages[0];
-    const pages: Omit<Page, "id">[] = parsedPages.map((p) => p.page);
+    
+    // Filter page layers based on the included state from layerInfos
+    const pages: Omit<Page, "id">[] = parsedPages.map((p) => {
+      const filteredLayers = p.page.layers.filter((_, idx) => p.layers[idx]?.included);
+      return { ...p.page, layers: filteredLayers };
+    });
+
     return buildTemplateFromPsdPages(
       templateName,
       pages,
@@ -77,44 +90,61 @@ export default function ConverterView() {
   };
 
   const totalSlots = parsedPages.reduce(
-    (n, p) => n + p.page.layers.filter((l) => l.type === "placeholder").length,
+    (n, p) => n + p.layers.filter(l => l.included && l.kind !== "text").length,
     0,
   );
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      <div className="w-full max-w-lg border-r flex flex-col bg-card overflow-y-auto">
-        <div className="p-4 space-y-4 border-b">
+    <div className="flex flex-1 overflow-hidden relative">
+      {/* Premium Glass Background Decorations */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-400/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div className="w-full max-w-lg flex flex-col z-10 glass-panel shadow-2xl border-r border-white/20">
+        <div className="p-6 space-y-6 border-b border-white/10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+            <Sparkles className="w-24 h-24 text-primary animate-pulse" />
+          </div>
           <div>
-            <h2 className="text-lg font-semibold">PSD → JSON Template</h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Upload album PSD sheets. Smart Objects &amp; layers named photo/img become placeholders.
+            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
+              PSD Import Studio
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Upload Photoshop files to auto-extract frames &amp; text.
             </p>
           </div>
 
-          <div className="space-y-1">
-            <Label className="text-xs">Print DPI (usually 300)</Label>
-            <Input
-              type="number"
-              value={dpi}
-              onChange={(e) => setDpi(Number(e.target.value) || 300)}
-              className="h-8"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">Print DPI</Label>
+              <Input
+                type="number"
+                value={dpi}
+                onChange={(e) => setDpi(Number(e.target.value) || 300)}
+                className="h-9 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-white/20"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 dark:text-slate-300">Template Name</Label>
+              <Input 
+                value={templateName} 
+                onChange={(e) => setTemplateName(e.target.value)} 
+                className="h-9 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-white/20" 
+              />
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <Label className="text-xs">Template name</Label>
-            <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} className="h-8" />
-          </div>
-
-          <Button
-            className="w-full"
+          <div 
+            className="group relative border-2 border-dashed border-blue-300 dark:border-blue-700/50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-blue-50/50 dark:hover:bg-blue-900/20 hover:border-blue-500 overflow-hidden"
             onClick={() => fileRef.current?.click()}
-            disabled={loading}
           >
-            <Upload className="h-4 w-4 mr-2" />
-            {loading ? "Converting…" : "Upload PSD file(s)"}
-          </Button>
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-100/20 to-purple-100/20 dark:from-blue-900/10 dark:to-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Upload className="h-10 w-10 text-blue-500 mb-3 group-hover:scale-110 transition-transform duration-300" />
+            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {loading ? "Analyzing PSD files..." : "Drag & Drop or Click to Upload"}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">Supports multiple .psd files</div>
+          </div>
           <input
             ref={fileRef}
             type="file"
@@ -129,91 +159,87 @@ export default function ConverterView() {
         </div>
 
         {parsedPages.length > 0 && (
-          <div className="p-4 space-y-3 border-b">
-            <div className="text-sm font-medium">
-              {parsedPages.length} page(s) · {totalSlots} photo slots detected
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" variant="outline" onClick={saveToLibrary}>
-                <Save className="h-4 w-4 mr-1" /> Save to library
-              </Button>
-              <Button size="sm" onClick={downloadJson}>
-                <Download className="h-4 w-4 mr-1" /> Download JSON
+          <div className="p-4 space-y-4 border-b border-white/10 bg-white/30 dark:bg-slate-800/30">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                <Layers className="h-4 w-4 text-blue-500" />
+                {parsedPages.length} Pages • {totalSlots} Slots
+              </div>
+              <Button size="sm" variant="ghost" className="h-7 text-xs text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setParsedPages([])}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Clear
               </Button>
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="w-full text-destructive"
-              onClick={() => setParsedPages([])}
-            >
-              <Trash2 className="h-4 w-4 mr-1" /> Clear all
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button onClick={saveToLibrary} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all">
+                <Save className="h-4 w-4 mr-2" /> Save Library
+              </Button>
+              <Button variant="outline" onClick={downloadJson} className="bg-white/50 dark:bg-slate-800/50 hover:bg-white/80 dark:hover:bg-slate-800/80 border-white/20">
+                <Download className="h-4 w-4 mr-2" /> Export JSON
+              </Button>
+            </div>
           </div>
         )}
 
-        <div className="flex-1 p-2 space-y-2">
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto custom-scrollbar">
           {parsedPages.map((p, i) => (
-            <div key={`${p.fileName}-${i}`} className="rounded border p-2 text-xs space-y-1">
-              <div className="flex items-center gap-2 font-medium">
-                <FileImage className="h-3.5 w-3.5" />
-                <span className="truncate">{p.fileName}</span>
+            <div key={`${p.fileName}-${i}`} className="rounded-xl border border-white/20 bg-white/40 dark:bg-slate-800/40 backdrop-blur-md p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2">
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <FileImage className="h-4 w-4 text-blue-500" />
+                  <span className="truncate max-w-[200px]" title={p.fileName}>{p.fileName}</span>
+                </div>
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-red-500" onClick={() => setParsedPages((prev) => prev.filter((_, idx) => idx !== i))}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <div className="text-muted-foreground">
-                {p.widthIn}×{p.heightIn} in ·{" "}
-                {p.page.layers.filter((l) => l.type === "placeholder").length} slots ·{" "}
-                {p.page.layers.filter((l) => l.type === "text").length} text
+              
+              <div className="text-xs text-slate-500 font-medium flex gap-3">
+                <span>{p.widthIn}" × {p.heightIn}"</span>
               </div>
-              <ul className="text-[10px] text-muted-foreground max-h-24 overflow-y-auto">
-                {p.layers
-                  .filter((l) => l.included)
-                  .map((l) => (
-                    <li key={l.id}>
-                      {l.kind === "photo-slot" ? "📷" : "T"} {l.name}
-                    </li>
-                  ))}
-              </ul>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-[10px]"
-                onClick={() => setParsedPages((prev) => prev.filter((_, idx) => idx !== i))}
-              >
-                Remove
-              </Button>
+              
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Detected Layers</div>
+                {p.layers.map((l) => (
+                  <div key={l.id} className={`flex items-center justify-between p-1.5 rounded-md text-xs transition-colors ${l.included ? 'bg-blue-50/50 dark:bg-blue-900/20' : 'opacity-60'}`}>
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      {l.kind === "text" ? <Type className="h-3 w-3 text-emerald-500" /> : <ImageIcon className="h-3 w-3 text-blue-500" />}
+                      <span className="truncate max-w-[150px] font-medium" title={l.name}>{l.name}</span>
+                    </div>
+                    <Switch 
+                      checked={l.included} 
+                      onCheckedChange={() => toggleLayerIncluded(i, l.id)}
+                      className="scale-75 data-[state=checked]:bg-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 p-6 overflow-y-auto bg-muted/20">
-        <div className="max-w-xl space-y-4">
-          <h3 className="font-semibold">How this step works</h3>
-          <ol className="text-sm space-y-3 list-decimal list-inside text-muted-foreground">
-            <li>
-              <strong className="text-foreground">Designer</strong> uploads PSD sheets (one PSD = one
-              album page/spread).
-            </li>
-            <li>
-              App detects <strong className="text-foreground">Smart Objects</strong> and layers named
-              photo/img as placeholders.
-            </li>
-            <li>
-              Text layers are copied. Background defaults to white (add in Step 2 if needed).
-            </li>
-            <li>
-              Click <strong className="text-foreground">Save to library</strong> or{" "}
-              <strong className="text-foreground">Download JSON</strong> to share with the team.
-            </li>
-            <li>
-              <strong className="text-foreground">Operator</strong> uses Step 3 — load template, upload
-              photos, export PDF.
-            </li>
-          </ol>
-          <div className="rounded-lg border bg-card p-4 text-xs text-muted-foreground">
-            <strong className="text-foreground">Tip:</strong> For best results, name photo layers clearly
-            in Photoshop (Photo 1, IMG, Smart Object). Send us PSDs when ready — we can tune detection
-            rules for your files.
+      <div className="flex-1 p-8 overflow-y-auto relative z-0 flex items-center justify-center">
+        <div className="max-w-md w-full glass-panel rounded-2xl p-8 space-y-6 shadow-2xl transform transition-all hover:scale-[1.01]">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-lg mb-6">
+            <Sparkles className="text-white w-6 h-6" />
+          </div>
+          <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Smart PSD Import</h3>
+          <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-sm">
+            We automatically scan your PSD layers and convert Rectangles, Shapes, and Smart Objects into photo slots.
+          </p>
+          
+          <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <h4 className="font-semibold text-sm uppercase tracking-wider text-slate-500">Troubleshooting</h4>
+            <ul className="text-sm space-y-3 text-slate-600 dark:text-slate-400">
+              <li className="flex gap-2 items-start">
+                <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">1</div>
+                <span>If a frame is missing, find it in the "Detected Layers" list and toggle it ON.</span>
+              </li>
+              <li className="flex gap-2 items-start">
+                <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">2</div>
+                <span>Background layers are automatically skipped to avoid making them placeholders.</span>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

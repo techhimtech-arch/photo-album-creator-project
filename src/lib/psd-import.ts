@@ -84,14 +84,25 @@ function classifyLayer(layer: PsdLayer, docW: number, docH: number): PsdLayerInf
   if (layer.hidden) return "other";
   if (layer.text) return "text";
   if (layer.placedLayer) return "photo-slot";
-  const name = (layer.name || "").toLowerCase();
-  if (/photo|img|image|pic|slot|picture|frame|smart/i.test(name)) return "photo-slot";
+  
   const { width, height } = layerBounds(layer);
   const area = width * height;
   const docArea = docW * docH;
-  if (area > docArea * 0.9) return "other";
+
+  // Skip layers that are almost the whole page (likely backgrounds)
+  if (area > docArea * 0.95) return "other";
+  // Skip tiny layers
   if (width < 30 || height < 30) return "other";
-  return "other";
+
+  const name = (layer.name || "").toLowerCase();
+  
+  // If it's explicitly named background, skip it
+  if (/bg|background/i.test(name)) return "other";
+
+  // More permissive matching: include shapes, rectangles, ellipses, and generic layers
+  if (/photo|img|image|pic|slot|picture|frame|smart|shape|rectangle|ellipse|polygon|layer/i.test(name)) return "photo-slot";
+
+  return "photo-slot"; // Default to treating other unknown layers as slots too if they passed size checks
 }
 
 function isSlotKind(kind: PsdLayerInfo["kind"]) {
@@ -176,7 +187,6 @@ export async function parsePsdFile(file: File, dpi = 300): Promise<PsdParseResul
   const flat = flattenLayers(psd.children);
   const { widthIn, heightIn, preset } = inferSize(psd.width, psd.height, dpi);
 
-  let slotIndex = 0;
   const layerInfos: PsdLayerInfo[] = flat.map((layer) => {
     const b = layerBounds(layer);
     const kind = classifyLayer(layer, psd.width, psd.height);
@@ -192,20 +202,22 @@ export async function parsePsdFile(file: File, dpi = 300): Promise<PsdParseResul
     };
   });
 
+  // Store the raw ag-psd layers temporarily to build the page later
+  // We can't put raw psd layers into state easily, so we build all editor layers up front
+  let slotIndex = 0;
   const editorLayers: Layer[] = [];
   flat.forEach((layer, i) => {
     const info = layerInfos[i];
-    if (!info.included) return;
     if (info.kind === "text" && layer.text) {
       editorLayers.push(psdTextToLayer(layer, dpi, editorLayers.length));
-    } else if (isSlotKind(info.kind)) {
+    } else {
       editorLayers.push(psdSlotToPlaceholder(layer, dpi, slotIndex++));
     }
   });
 
   const page: Omit<Page, "id"> = {
     background: defaultBackground(psd),
-    layers: editorLayers,
+    layers: editorLayers, // ConverterView will filter this using layerInfos.included
     status: "draft",
   };
 
@@ -240,3 +252,4 @@ export function buildTemplateFromPsdPages(
     pages,
   };
 }
+
