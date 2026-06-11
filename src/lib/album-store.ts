@@ -29,6 +29,11 @@ import {
 } from "@/lib/album-persistence";
 import { LAYOUTS, type AlbumLayout } from "@/lib/layouts";
 import { inToEditorPx } from "@/lib/units";
+import {
+  isAlbumTemplate,
+  templateToAlbum,
+  type AlbumTemplate,
+} from "@/lib/album-template";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -121,6 +126,8 @@ interface State {
   // Features
   applyLayoutToPage: (pageId: string, layout: AlbumLayout) => void;
   fillPlaceholder: (pageId: string, placeholderId: string, photo: PhotoAsset) => void;
+  fillAllPlaceholders: () => { filled: number; emptyLeft: number; photosLeft: number };
+  applyAlbumTemplate: (template: AlbumTemplate) => void;
   autoFillAlbum: (photosToFill: PhotoAsset[]) => void;
   savePageAsLayout: (pageId: string, name: string) => void;
   addCustomLayout: (layout: AlbumLayout) => void;
@@ -438,6 +445,64 @@ export const useAlbumStore = create<State>((set, get) => ({
       }),
     }));
     set({ selectedLayerIds: [placeholderId] });
+  },
+
+  fillAllPlaceholders: () => {
+    const { album, photos, photoSort } = get();
+    const emptyBefore = album.pages.reduce(
+      (n, p) => n + p.layers.filter((l) => l.type === "placeholder").length,
+      0,
+    );
+
+    const usedSrcs = new Set<string>();
+    album.pages.forEach((p) =>
+      p.layers.forEach((l) => {
+        if (l.type === "image") usedSrcs.add(l.src);
+      }),
+    );
+
+    const queue = [...photos]
+      .filter((p) => !usedSrcs.has(p.src))
+      .sort((a, b) =>
+        photoSort === "name" ? a.name.localeCompare(b.name) : a.addedAt - b.addedAt,
+      );
+
+    let photoIdx = 0;
+    let filled = 0;
+
+    get().setAlbum((a) => {
+      const pages = a.pages.map((p) => {
+        let changed = false;
+        const layers = p.layers.map((l) => {
+          if (l.type !== "placeholder" || photoIdx >= queue.length) return l;
+          const next = placeholderToImageLayer(l, queue[photoIdx++]);
+          filled++;
+          changed = true;
+          return next;
+        });
+        return changed ? { ...p, layers } : p;
+      });
+      return { ...a, pages };
+    });
+
+    return {
+      filled,
+      emptyLeft: Math.max(0, emptyBefore - filled),
+      photosLeft: Math.max(0, queue.length - filled),
+    };
+  },
+
+  applyAlbumTemplate: (template) => {
+    if (!isAlbumTemplate(template)) return;
+    const a = templateToAlbum(template);
+    set({
+      album: a,
+      activePageId: a.pages[0]?.id ?? "",
+      selectedLayerIds: [],
+      photos: [],
+      history: [{ album: a }],
+      historyIndex: 0,
+    });
   },
 
   autoFillAlbum: (photosToFill) => {

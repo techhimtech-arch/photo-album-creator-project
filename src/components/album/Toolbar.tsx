@@ -16,8 +16,21 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ALBUM_PRESETS, type AlbumSizePreset } from "@/types/album";
-import { Undo2, Redo2, Download, Maximize2, Plus, MoreVertical, FilePlus2, Ruler, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import {
+  Undo2,
+  Redo2,
+  Download,
+  Maximize2,
+  Plus,
+  MoreVertical,
+  FilePlus2,
+  Ruler,
+  CheckCircle2,
+  LayoutTemplate,
+  Upload,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { downloadAlbumTemplate, isAlbumTemplate } from "@/lib/album-template";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +52,8 @@ export default function Toolbar() {
   const canUndo = useAlbumStore((s) => s.canUndo());
   const canRedo = useAlbumStore((s) => s.canRedo());
   const newAlbum = useAlbumStore((s) => s.newAlbum);
+  const applyAlbumTemplate = useAlbumStore((s) => s.applyAlbumTemplate);
+  const templateRef = useRef<HTMLInputElement>(null);
   const showGuides = useAlbumStore((s) => s.showGuides);
   const toggleGuides = useAlbumStore((s) => s.toggleGuides);
   const activePageId = useAlbumStore((s) => s.activePageId);
@@ -105,8 +120,67 @@ export default function Toolbar() {
           <DropdownMenuItem onClick={() => setCustomOpen(true)}>
             Custom size…
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => {
+              downloadAlbumTemplate(album);
+              toast({
+                title: "Template saved",
+                description: "All pages exported as a reusable design (no client photos).",
+              });
+            }}
+          >
+            <LayoutTemplate className="h-4 w-4" /> Save album template…
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => templateRef.current?.click()}>
+            <Upload className="h-4 w-4" /> Load album template…
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <input
+        ref={templateRef}
+        type="file"
+        accept=".json,.album-template.json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const json = JSON.parse(ev.target?.result as string);
+              if (!isAlbumTemplate(json)) {
+                toast({
+                  title: "Invalid template",
+                  description: "Choose a .album-template.json file.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              if (
+                !confirm(
+                  `Load template "${json.name}" (${json.pages.length} pages)? Current album will be replaced.`,
+                )
+              ) {
+                return;
+              }
+              applyAlbumTemplate(json);
+              toast({
+                title: "Template loaded",
+                description: `${json.pages.length} pages ready — upload photos and click Fill All.`,
+              });
+            } catch {
+              toast({
+                title: "Import failed",
+                description: "Could not read template file.",
+                variant: "destructive",
+              });
+            }
+          };
+          reader.readAsText(file);
+          e.target.value = "";
+        }}
+      />
 
       <Input
         value={album.name}
