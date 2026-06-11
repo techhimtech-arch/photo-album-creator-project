@@ -1,14 +1,15 @@
 import { useEffect } from "react";
 import { useAlbumStore } from "@/lib/album-store";
 import { isPhotoSlot } from "@/lib/slot-layers";
-import Toolbar from "@/components/album/Toolbar";
-import PageSidebar from "@/components/album/PageSidebar";
-import EditorCanvas from "@/components/album/EditorCanvas";
-import RightPanel from "@/components/album/RightPanel";
+import WorkflowNav from "@/components/workflow/WorkflowNav";
+import ConverterView from "@/components/workflow/ConverterView";
+import DesignerView from "@/components/workflow/DesignerView";
+import ProducerView from "@/components/workflow/ProducerView";
 import { preloadWeddingFonts } from "@/lib/fonts";
 
 const Index = () => {
   const ready = useAlbumStore((s) => s.ready);
+  const workflowMode = useAlbumStore((s) => s.workflowMode);
   const bootstrap = useAlbumStore((s) => s.bootstrap);
   const undo = useAlbumStore((s) => s.undo);
   const redo = useAlbumStore((s) => s.redo);
@@ -77,12 +78,10 @@ const Index = () => {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
-      <Toolbar />
-      <div className="flex flex-1 overflow-hidden">
-        <PageSidebar />
-        <EditorCanvas />
-        <RightPanel />
-      </div>
+      <WorkflowNav />
+      {workflowMode === "converter" && <ConverterView />}
+      {workflowMode === "designer" && <DesignerView />}
+      {workflowMode === "producer" && <ProducerView />}
     </div>
   );
 };

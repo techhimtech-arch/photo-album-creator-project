@@ -134,13 +134,16 @@ export function isAlbumTemplate(data: unknown): data is AlbumTemplate {
   );
 }
 
-export function downloadAlbumTemplate(album: Album) {
-  const template = albumToTemplate(album);
-  const safeName = (album.name || "album-template").replace(/[^\w\s-]/g, "").trim();
+export function downloadTemplateJson(template: AlbumTemplate) {
+  const safeName = template.name.replace(/[^\w\s-]/g, "").trim() || "album-template";
   const dataStr =
     "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(template, null, 2));
   const a = document.createElement("a");
   a.href = dataStr;
-  a.download = `${safeName || "album-template"}.album-template.json`;
+  a.download = `${safeName}.album-template.json`;
   a.click();
+}
+
+export function downloadAlbumTemplate(album: Album) {
+  downloadTemplateJson(albumToTemplate(album));
 }

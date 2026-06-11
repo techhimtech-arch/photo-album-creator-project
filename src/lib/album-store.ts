@@ -26,6 +26,11 @@ import {
   savePhotos,
   loadCustomLayouts,
   saveCustomLayouts,
+  loadTemplateLibrary,
+  saveTemplateLibrary,
+  loadWorkflowMode,
+  saveWorkflowMode,
+  type WorkflowMode,
 } from "@/lib/album-persistence";
 import { LAYOUTS, type AlbumLayout } from "@/lib/layouts";
 import { inToEditorPx } from "@/lib/units";
@@ -83,8 +88,13 @@ interface State {
   layoutGap: number;
   history: HistoryEntry[];
   historyIndex: number;
+  workflowMode: WorkflowMode;
+  templateLibrary: AlbumTemplate[];
 
   bootstrap: () => Promise<void>;
+  setWorkflowMode: (mode: WorkflowMode) => void;
+  addToTemplateLibrary: (template: AlbumTemplate) => void;
+  removeFromTemplateLibrary: (name: string) => void;
   setAlbum: (updater: (a: Album) => Album, snapshot?: boolean) => void;
   newAlbum: (preset: AlbumSizePreset, custom?: { widthIn: number; heightIn: number }) => void;
   resizeAlbum: (preset: AlbumSizePreset, custom?: { widthIn: number; heightIn: number }) => void;
@@ -154,13 +164,17 @@ export const useAlbumStore = create<State>((set, get) => ({
   layoutGap: 16,
   history: [],
   historyIndex: -1,
+  workflowMode: "producer",
+  templateLibrary: [],
 
   bootstrap: async () => {
-    const [album, photos, decorations, layouts] = await Promise.all([
+    const [album, photos, decorations, layouts, templates, workflowMode] = await Promise.all([
       loadAlbum(),
       loadPhotos(),
       loadDecorations(),
       loadCustomLayouts(),
+      loadTemplateLibrary(),
+      loadWorkflowMode(),
     ]);
     const a = album ?? createBlankAlbum();
     set({
@@ -169,10 +183,26 @@ export const useAlbumStore = create<State>((set, get) => ({
       photos,
       decorations,
       customLayouts: layouts,
+      templateLibrary: templates,
+      workflowMode,
       ready: true,
       history: [{ album: a }],
       historyIndex: 0,
     });
+  },
+
+  setWorkflowMode: (mode) => {
+    set({ workflowMode: mode });
+    void saveWorkflowMode(mode);
+  },
+
+  addToTemplateLibrary: (template) => {
+    const lib = get().templateLibrary.filter((t) => t.name !== template.name);
+    set({ templateLibrary: [...lib, template] });
+  },
+
+  removeFromTemplateLibrary: (name) => {
+    set({ templateLibrary: get().templateLibrary.filter((t) => t.name !== name) });
   },
 
   setAlbum: (updater, snapshot = true) => {
@@ -675,6 +705,7 @@ let lastAlbum: Album | null = null;
 let lastPhotos: PhotoAsset[] | null = null;
 let lastDecor: DecorationAsset[] | null = null;
 let lastLayouts: AlbumLayout[] | null = null;
+let lastTemplateLib: AlbumTemplate[] | null = null;
 
 useAlbumStore.subscribe((s) => {
   if (!s.ready) return;
@@ -697,5 +728,10 @@ useAlbumStore.subscribe((s) => {
     lastLayouts = s.customLayouts;
     if (layoutsTimer) clearTimeout(layoutsTimer);
     layoutsTimer = setTimeout(() => void saveCustomLayouts(s.customLayouts), 500);
+  }
+  if (s.templateLibrary !== lastTemplateLib) {
+    lastTemplateLib = s.templateLibrary;
+    if (layoutsTimer) clearTimeout(layoutsTimer);
+    layoutsTimer = setTimeout(() => void saveTemplateLibrary(s.templateLibrary), 500);
   }
 });
