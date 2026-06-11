@@ -95,7 +95,16 @@ export interface DecorationLayer extends LayerBase {
     | "lighten";
 }
 
-export type Layer = ImageLayer | TextLayer | DecorationLayer;
+export interface PlaceholderLayer extends LayerBase {
+  type: "placeholder";
+  mask: MaskKind;
+  cornerRadius: number;
+  border?: Border;
+}
+
+export type Layer = ImageLayer | TextLayer | DecorationLayer | PlaceholderLayer;
+
+export type PhotoSlotLayer = ImageLayer | PlaceholderLayer;
 
 export type PageBackground =
   | { kind: "color"; color: string }

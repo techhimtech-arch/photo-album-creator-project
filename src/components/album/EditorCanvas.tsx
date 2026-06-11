@@ -6,6 +6,7 @@ import { inToEditorPx } from "@/lib/units";
 import type { Page } from "@/types/album";
 import PageBackgroundNode from "./layers/PageBackgroundNode";
 import ImageLayerNode from "./layers/ImageLayerNode";
+import PlaceholderLayerNode from "./layers/PlaceholderLayerNode";
 import TextLayerNode from "./layers/TextLayerNode";
 import DecorationLayerNode from "./layers/DecorationLayerNode";
 import { getSnapLines } from "@/lib/snapping";
@@ -129,6 +130,8 @@ export default function EditorCanvas() {
               if (!layer.visible) return null;
               if (layer.type === "image")
                 return <ImageLayerNode key={layer.id} layer={layer} pageId={page.id} />;
+              if (layer.type === "placeholder")
+                return <PlaceholderLayerNode key={layer.id} layer={layer} pageId={page.id} />;
               if (layer.type === "text")
                 return <TextLayerNode key={layer.id} layer={layer} pageId={page.id} />;
               if (layer.type === "decoration")

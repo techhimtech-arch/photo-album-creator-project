@@ -13,6 +13,7 @@ import {
   Type,
   Image as ImageIcon,
   Sparkles,
+  Frame,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -60,7 +61,13 @@ export default function LayersPanel() {
         )}
         {layers.map((l) => {
           const Icon =
-            l.type === "text" ? Type : l.type === "decoration" ? Sparkles : ImageIcon;
+            l.type === "text"
+              ? Type
+              : l.type === "decoration"
+                ? Sparkles
+                : l.type === "placeholder"
+                  ? Frame
+                  : ImageIcon;
           return (
             <div
               key={l.id}

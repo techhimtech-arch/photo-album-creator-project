@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { Layer, ImageLayer, TextLayer, DecorationLayer } from "@/types/album";
+import type { Layer, ImageLayer, TextLayer, DecorationLayer, PlaceholderLayer } from "@/types/album";
 import { FlipHorizontal2, FlipVertical2 } from "lucide-react";
 
 export default function PropertiesPanel() {
@@ -61,6 +61,7 @@ export default function PropertiesPanel() {
       </div>
 
       {layer.type === "image" && <ImageProps layer={layer} patch={patch} commit={commit} />}
+      {layer.type === "placeholder" && <PlaceholderProps layer={layer} patch={patch} commit={commit} />}
       {layer.type === "text" && <TextProps layer={layer} patch={patch} commit={commit} />}
       {layer.type === "decoration" && <DecorProps layer={layer} patch={patch} commit={commit} />}
     </div>
@@ -88,6 +89,91 @@ function NumInput({
         onBlur={onBlur}
         className="h-8"
       />
+    </div>
+  );
+}
+
+function PlaceholderProps({
+  layer,
+  patch,
+  commit,
+}: {
+  layer: PlaceholderLayer;
+  patch: (p: Partial<Layer>) => void;
+  commit: () => void;
+}) {
+  return (
+    <div className="space-y-3 border-t pt-3">
+      <p className="text-xs text-muted-foreground">
+        Empty photo slot. Click a photo in the gallery to fill this placeholder.
+      </p>
+      <div>
+        <Label>Mask</Label>
+        <Select
+          value={layer.mask}
+          onValueChange={(v) => {
+            patch({ mask: v as PlaceholderLayer["mask"] } as Partial<PlaceholderLayer>);
+            commit();
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Rectangle</SelectItem>
+            <SelectItem value="rounded">Rounded</SelectItem>
+            <SelectItem value="circle">Circle</SelectItem>
+            <SelectItem value="heart">Heart</SelectItem>
+            <SelectItem value="star">Star</SelectItem>
+            <SelectItem value="hexagon">Hexagon</SelectItem>
+            <SelectItem value="triangle">Triangle</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {layer.mask === "rounded" && (
+        <div>
+          <div className="flex justify-between">
+            <Label>Corner radius</Label>
+            <span className="text-xs text-muted-foreground">{layer.cornerRadius}px</span>
+          </div>
+          <Slider
+            min={0}
+            max={Math.min(layer.width, layer.height) / 2}
+            step={1}
+            value={[layer.cornerRadius]}
+            onValueChange={(v) => patch({ cornerRadius: v[0] } as Partial<PlaceholderLayer>)}
+            onValueCommit={commit}
+          />
+        </div>
+      )}
+      <div className="space-y-1">
+        <Label>Border</Label>
+        <div className="grid grid-cols-[1fr_60px] gap-2">
+          <Slider
+            min={0}
+            max={20}
+            step={1}
+            value={[layer.border?.width ?? 0]}
+            onValueChange={(v) =>
+              patch({
+                border: { width: v[0], color: layer.border?.color ?? "#ffffff" },
+              } as Partial<PlaceholderLayer>)
+            }
+            onValueCommit={commit}
+          />
+          <Input
+            type="color"
+            value={layer.border?.color ?? "#ffffff"}
+            onChange={(e) =>
+              patch({
+                border: { width: layer.border?.width ?? 0, color: e.target.value },
+              } as Partial<PlaceholderLayer>)
+            }
+            onBlur={commit}
+            className="h-8 p-1"
+          />
+        </div>
+      </div>
     </div>
   );
 }

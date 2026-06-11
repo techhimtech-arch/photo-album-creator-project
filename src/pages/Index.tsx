@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAlbumStore } from "@/lib/album-store";
+import { isPhotoSlot } from "@/lib/slot-layers";
 import Toolbar from "@/components/album/Toolbar";
 import PageSidebar from "@/components/album/PageSidebar";
 import EditorCanvas from "@/components/album/EditorCanvas";
@@ -44,11 +45,11 @@ const Index = () => {
         const s = useAlbumStore.getState();
         const page = s.album.pages.find((p) => p.id === s.activePageId);
         if (!page) return;
-        const images = page.layers.filter((l) => l.type === "image");
-        if (images.length === 0) return;
-        
-        let category = images.length.toString();
-        if (images.length > 6) category = "collage";
+        const slots = page.layers.filter(isPhotoSlot);
+        if (slots.length === 0) return;
+
+        let category = slots.length.toString();
+        if (slots.length > 6) category = "collage";
         
         // Import LAYOUTS dynamically or from store if available.
         // Actually we need LAYOUTS from @/lib/layouts. Let's do it cleanly:

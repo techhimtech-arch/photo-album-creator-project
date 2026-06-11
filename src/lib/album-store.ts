@@ -8,7 +8,14 @@ import type {
   Page,
   PageBackground,
   PhotoAsset,
+  PlaceholderLayer,
 } from "@/types/album";
+import {
+  createImageLayerFromSlot,
+  createPlaceholderLayer,
+  isPhotoSlot,
+  placeholderToImageLayer,
+} from "@/lib/slot-layers";
 import { ALBUM_PRESETS } from "@/types/album";
 import {
   loadAlbum,
@@ -113,6 +120,7 @@ interface State {
 
   // Features
   applyLayoutToPage: (pageId: string, layout: AlbumLayout) => void;
+  fillPlaceholder: (pageId: string, placeholderId: string, photo: PhotoAsset) => void;
   autoFillAlbum: (photosToFill: PhotoAsset[]) => void;
   savePageAsLayout: (pageId: string, name: string) => void;
   addCustomLayout: (layout: AlbumLayout) => void;
@@ -339,84 +347,55 @@ export const useAlbumStore = create<State>((set, get) => ({
       const pageHpx = inToEditorPx(a.heightIn);
       const gap = get().layoutGap || 0;
 
-      const existingImages = page.layers.filter((l): l is ImageLayer => l.type === "image");
-      const otherLayers = page.layers.filter((l) => l.type !== "image" && !l.isTemplate);
+      const existingSlots = page.layers.filter(isPhotoSlot);
+      const otherLayers = page.layers.filter((l) => !isPhotoSlot(l) && !l.isTemplate);
 
       const availablePhotos = get().photos;
       const usedSrcs = new Set<string>();
       a.pages.forEach((p) =>
         p.layers.forEach((l) => {
           if (l.type === "image") usedSrcs.add(l.src);
-        })
+        }),
       );
-      const unusedPhotos = availablePhotos.filter((p) => !usedSrcs.has(p.src));
+      const unusedPhotos = [...availablePhotos.filter((p) => !usedSrcs.has(p.src))];
 
       const newLayers: Layer[] = [...otherLayers];
 
       layout.slots.forEach((slot, i) => {
-        let photoSrc = "";
-        let naturalWidth = 1000;
-        let naturalHeight = 1000;
-        let name = `Slot ${i + 1}`;
-        let existingId = uid();
-        let border = undefined;
+        const existing = existingSlots[i];
 
-        if (i < existingImages.length) {
-          photoSrc = existingImages[i].src;
-          naturalWidth = existingImages[i].naturalWidth;
-          naturalHeight = existingImages[i].naturalHeight;
-          name = existingImages[i].name;
-          existingId = existingImages[i].id;
-          border = existingImages[i].border;
-        } else if (unusedPhotos.length > 0) {
-          const nextPhoto = unusedPhotos.shift()!;
-          photoSrc = nextPhoto.src;
-          naturalWidth = nextPhoto.width;
-          naturalHeight = nextPhoto.height;
-          name = nextPhoto.name;
-          border = { width: 4, color: "#ffffff" };
-        } else if (availablePhotos.length > 0) {
-          const fallback = availablePhotos[i % availablePhotos.length];
-          photoSrc = fallback.src;
-          naturalWidth = fallback.width;
-          naturalHeight = fallback.height;
-          name = fallback.name;
-          border = { width: 4, color: "#ffffff" };
-        } else {
-          return; // No photo to fill this slot
+        if (existing?.type === "image") {
+          newLayers.push(
+            createImageLayerFromSlot(slot, pageWpx, pageHpx, gap, {
+              id: existing.id,
+              name: existing.name,
+              src: existing.src,
+              width: existing.naturalWidth,
+              height: existing.naturalHeight,
+              addedAt: 0,
+            }, existing),
+          );
+          return;
         }
 
-        const sw = slot.w * pageWpx;
-        const sh = slot.h * pageHpx;
-        const sx = slot.x * pageWpx;
-        const sy = slot.y * pageHpx;
-  
-        const fw = Math.max(10, sw - gap);
-        const fh = Math.max(10, sh - gap);
-        const fx = sx + gap / 2;
-        const fy = sy + gap / 2;
+        if (existing?.type === "placeholder") {
+          newLayers.push(createPlaceholderLayer(slot, pageWpx, pageHpx, gap, i, existing));
+          return;
+        }
 
-        newLayers.push({
-          id: existingId,
-          name,
-          type: "image",
-          src: photoSrc,
-          naturalWidth,
-          naturalHeight,
-          x: fx,
-          y: fy,
-          width: fw,
-          height: fh,
-          rotation: 0,
-          opacity: 1,
-          visible: true,
-          locked: false,
-          mask: "none",
-          cornerRadius: 12,
-          flipH: false,
-          flipV: false,
-          border,
-        });
+        if (unusedPhotos.length > 0) {
+          const nextPhoto = unusedPhotos.shift()!;
+          newLayers.push(createImageLayerFromSlot(slot, pageWpx, pageHpx, gap, nextPhoto));
+          return;
+        }
+
+        if (availablePhotos.length > 0) {
+          const fallback = availablePhotos[i % availablePhotos.length];
+          newLayers.push(createImageLayerFromSlot(slot, pageWpx, pageHpx, gap, fallback));
+          return;
+        }
+
+        newLayers.push(createPlaceholderLayer(slot, pageWpx, pageHpx, gap, i));
       });
 
       if (layout.elements) {
@@ -442,6 +421,23 @@ export const useAlbumStore = create<State>((set, get) => ({
       nextPages[pageIndex] = newPage;
       return { ...a, pages: nextPages };
     });
+  },
+
+  fillPlaceholder: (pageId, placeholderId, photo) => {
+    get().setAlbum((a) => ({
+      ...a,
+      pages: a.pages.map((p) => {
+        if (p.id !== pageId) return p;
+        const idx = p.layers.findIndex((l) => l.id === placeholderId);
+        if (idx === -1) return p;
+        const layer = p.layers[idx];
+        if (layer.type !== "placeholder") return p;
+        const layers = p.layers.slice();
+        layers[idx] = placeholderToImageLayer(layer as PlaceholderLayer, photo);
+        return { ...p, layers };
+      }),
+    }));
+    set({ selectedLayerIds: [placeholderId] });
   },
 
   autoFillAlbum: (photosToFill) => {
@@ -544,21 +540,21 @@ export const useAlbumStore = create<State>((set, get) => ({
     const page = album.pages.find((p) => p.id === pageId);
     if (!page) return;
 
-    const images = page.layers.filter((l): l is ImageLayer => l.type === "image");
-    if (images.length === 0) return;
+    const slots_layers = page.layers.filter(isPhotoSlot);
+    if (slots_layers.length === 0) return;
 
     const pageWpx = inToEditorPx(album.widthIn);
     const pageHpx = inToEditorPx(album.heightIn);
 
-    const slots = images.map((img) => ({
+    const slots = slots_layers.map((img) => ({
       x: img.x / pageWpx,
       y: img.y / pageHpx,
       w: img.width / pageWpx,
       h: img.height / pageHpx,
     }));
 
-    let category = images.length.toString() as AlbumLayout["category"];
-    if (images.length > 6) category = "collage";
+    let category = slots_layers.length.toString() as AlbumLayout["category"];
+    if (slots_layers.length > 6) category = "collage";
 
     const elements = page.layers
       .filter((l) => l.type === "text" || l.type === "decoration")
@@ -575,7 +571,7 @@ export const useAlbumStore = create<State>((set, get) => ({
 
     const layout: AlbumLayout = {
       id: `custom-${uid()}`,
-      name: name || `Custom Layout (${images.length} photos)`,
+      name: name || `Custom Layout (${slots_layers.length} slots)`,
       category,
       slots,
       elements: elements.length > 0 ? elements : undefined,

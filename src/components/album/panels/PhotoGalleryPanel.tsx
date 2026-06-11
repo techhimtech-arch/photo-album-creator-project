@@ -15,6 +15,8 @@ export default function PhotoGalleryPanel() {
   const album = useAlbumStore((s) => s.album);
   const activePageId = useAlbumStore((s) => s.activePageId);
   const addLayer = useAlbumStore((s) => s.addLayer);
+  const fillPlaceholder = useAlbumStore((s) => s.fillPlaceholder);
+  const selectedLayerIds = useAlbumStore((s) => s.selectedLayerIds);
   const autoFillAlbum = useAlbumStore((s) => s.autoFillAlbum);
   const photoSort = useAlbumStore((s) => s.photoSort);
   const setPhotoSort = useAlbumStore((s) => s.setPhotoSort);
@@ -50,6 +52,25 @@ export default function PhotoGalleryPanel() {
   };
 
   const placePhotoOnPage = async (photo: PhotoAsset) => {
+    const page = album.pages.find((p) => p.id === activePageId);
+    if (!page) return;
+
+    const selectedPlaceholder = page.layers.find(
+      (l) => l.type === "placeholder" && selectedLayerIds.includes(l.id),
+    );
+    if (selectedPlaceholder) {
+      fillPlaceholder(activePageId, selectedPlaceholder.id, photo);
+      toast({ title: "Photo placed", description: `Filled ${selectedPlaceholder.name}.` });
+      return;
+    }
+
+    const firstEmpty = page.layers.find((l) => l.type === "placeholder");
+    if (firstEmpty) {
+      fillPlaceholder(activePageId, firstEmpty.id, photo);
+      toast({ title: "Photo placed", description: `Filled ${firstEmpty.name}.` });
+      return;
+    }
+
     const pageWpx = inToEditorPx(album.widthIn);
     const pageHpx = inToEditorPx(album.heightIn);
     const maxW = pageWpx * 0.4;
@@ -191,7 +212,7 @@ export default function PhotoGalleryPanel() {
                 key={p.id}
                 className="group relative aspect-square overflow-hidden rounded border bg-muted cursor-pointer"
                 onClick={() => placePhotoOnPage(p)}
-                title={`Click to add to page`}
+                title="Click to fill next placeholder or add to page"
               >
                 <img src={p.src} alt={p.name} className="h-full w-full object-cover" />
                 {usedSrcs.has(p.src) && (

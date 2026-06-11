@@ -37,7 +37,7 @@ export default function LayoutsPanel() {
   const applyLayout = (layout: AlbumLayout) => {
     if (!activePageId) return;
     applyLayoutToPage(activePageId, layout);
-    toast({ title: "Layout applied", description: `Reorganized page to match layout.` });
+    toast({ title: "Layout applied", description: "Photo slots placed on page. Empty slots show as placeholders." });
   };
 
   const handleSaveCurrentPage = () => {
@@ -185,7 +185,7 @@ export default function LayoutsPanel() {
         ))}
       </div>
       <div className="border-t p-2 text-[11px] text-muted-foreground">
-        Click a layout to rearrange the photos on your current page.
+        Click a layout to place photo slots. Works without photos — empty slots appear as placeholders.
       </div>
     </div>
   );

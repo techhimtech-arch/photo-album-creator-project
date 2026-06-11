@@ -93,7 +93,7 @@ async function renderPageToCanvas(
 
   // Layers in order
   for (const l of page.layers) {
-    if (!l.visible) continue;
+    if (!l.visible || l.type === "placeholder") continue;
     await addLayerToRoot(root, l);
   }
 
