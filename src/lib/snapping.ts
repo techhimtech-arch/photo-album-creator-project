@@ -13,7 +13,7 @@ export function getSnapLines(
   pageH: number,
   layers: any[],
   tolerance: number
-): { x?: number; y?: number; xLine?: number; yLine?: number; w?: number; h?: number; type: "h" | "v" }[] {
+): { xLine?: number; yLine?: number; type: "h" | "v"; length: number }[] {
   const box = node.getClientRect({ skipTransform: false });
   // Konva clientRect includes scale, so we need to divide by node's absolute scale if it's inside a scaled layer.
   // Actually, node.x() and node.y() are relative to the parent layer.
@@ -54,7 +54,7 @@ export function getSnapLines(
     });
   }
 
-  const result: any[] = [];
+  const result: { xLine?: number; yLine?: number; type: "h" | "v"; length: number }[] = [];
   let snappedX = false;
   let snappedY = false;
 
