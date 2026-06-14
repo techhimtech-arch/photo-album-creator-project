@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useAlbumStore } from "@/lib/album-store";
-import { isAlbumTemplate, downloadTemplateJson } from "@/lib/album-template";
+import { isAlbumTemplate, downloadTemplateJson, countAlbumSlots } from "@/lib/album-template";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2, Upload, Play } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
