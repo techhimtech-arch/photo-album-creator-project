@@ -21,9 +21,9 @@ export default defineConfig(({ mode }) => ({
       devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "icon-192.png", "icon-512.png"],
       manifest: {
-        name: "ID Card Studio",
-        short_name: "ID Studio",
-        description: "Create school ID cards in your browser. Works offline.",
+        name: "Photo Album Creator",
+        short_name: "Album Creator",
+        description: "Design beautiful photo albums and wedding albums in your browser. Works offline.",
         theme_color: "#1d4ed8",
         background_color: "#ffffff",
         display: "standalone",
