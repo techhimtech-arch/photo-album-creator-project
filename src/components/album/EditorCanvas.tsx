@@ -28,10 +28,19 @@ export default function EditorCanvas() {
   const trRef = useRef<Konva.Transformer>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [snapLines, setSnapLines] = useState<{ xLine?: number; yLine?: number; type: "h" | "v"; length: number }[]>([]);
+  const snapLinesKeyRef = useRef<string>("");
 
   useKeyboardShortcuts();
 
   const page: Page | undefined = album.pages.find((p) => p.id === activePageId);
+
+  // Determine if all selected layers should keep aspect ratio (images/placeholders/decorations)
+  const keepRatio = (() => {
+    if (!page || selected.length === 0) return false;
+    const sel = page.layers.filter((l) => selected.includes(l.id));
+    if (sel.length === 0) return false;
+    return sel.every((l) => l.type === "image" || l.type === "placeholder" || l.type === "decoration");
+  })();
 
   const pageW = inToEditorPx(album.widthIn);
   const pageH = inToEditorPx(album.heightIn);
@@ -95,14 +104,25 @@ export default function EditorCanvas() {
         onDragMove={(e) => {
           const node = e.target;
           if (node.name() === "page-bg" || node.className === "Transformer" || node.name() === "_anchor") {
-            setSnapLines([]);
+            if (snapLinesKeyRef.current !== "") {
+              snapLinesKeyRef.current = "";
+              setSnapLines([]);
+            }
             return;
           }
           const lines = getSnapLines(node, pageW, pageH, [], 5 / scale);
-          setSnapLines(lines);
+          // Dedupe: only setState if guide positions actually changed (avoids 60fps re-render thrash)
+          const key = lines.map((l) => `${l.type}:${l.xLine ?? l.yLine}`).join("|");
+          if (key !== snapLinesKeyRef.current) {
+            snapLinesKeyRef.current = key;
+            setSnapLines(lines);
+          }
         }}
         onDragEnd={() => {
-          setSnapLines([]);
+          if (snapLinesKeyRef.current !== "") {
+            snapLinesKeyRef.current = "";
+            setSnapLines([]);
+          }
         }}
       >
         <Layer x={offsetX} y={offsetY} scaleX={scale} scaleY={scale} listening={false}>
@@ -175,7 +195,7 @@ export default function EditorCanvas() {
             listening={false}
           />
           
-          <KonvaTransformerRef trRef={trRef} />
+          <KonvaTransformerRef trRef={trRef} keepRatio={keepRatio} />
 
           {/* Snap Guides */}
           {snapLines.map((l, i) => (
@@ -217,16 +237,30 @@ export default function EditorCanvas() {
   );
 }
 
-function KonvaTransformerRef({ trRef }: { trRef: React.RefObject<Konva.Transformer | null> }) {
+function KonvaTransformerRef({
+  trRef,
+  keepRatio,
+}: {
+  trRef: React.RefObject<Konva.Transformer | null>;
+  keepRatio: boolean;
+}) {
   return (
     <KonvaTransformer
       ref={trRef as React.RefObject<Konva.Transformer>}
       rotateEnabled
-      keepRatio={false}
+      // Default proportional for photos/decorations; Shift toggles to free (handled by Konva: shiftBehavior).
+      keepRatio={keepRatio}
+      shiftBehavior={keepRatio ? "inverted" : "default"}
+      enabledAnchors={
+        keepRatio
+          ? ["top-left", "top-right", "bottom-left", "bottom-right"]
+          : undefined
+      }
       borderStroke="#3b82f6"
       anchorStroke="#3b82f6"
       anchorFill="#fff"
       anchorSize={8}
+      rotateAnchorOffset={24}
     />
   );
 }
