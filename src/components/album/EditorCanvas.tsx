@@ -104,14 +104,25 @@ export default function EditorCanvas() {
         onDragMove={(e) => {
           const node = e.target;
           if (node.name() === "page-bg" || node.className === "Transformer" || node.name() === "_anchor") {
-            setSnapLines([]);
+            if (snapLinesKeyRef.current !== "") {
+              snapLinesKeyRef.current = "";
+              setSnapLines([]);
+            }
             return;
           }
           const lines = getSnapLines(node, pageW, pageH, [], 5 / scale);
-          setSnapLines(lines);
+          // Dedupe: only setState if guide positions actually changed (avoids 60fps re-render thrash)
+          const key = lines.map((l) => `${l.type}:${l.xLine ?? l.yLine}`).join("|");
+          if (key !== snapLinesKeyRef.current) {
+            snapLinesKeyRef.current = key;
+            setSnapLines(lines);
+          }
         }}
         onDragEnd={() => {
-          setSnapLines([]);
+          if (snapLinesKeyRef.current !== "") {
+            snapLinesKeyRef.current = "";
+            setSnapLines([]);
+          }
         }}
       >
         <Layer x={offsetX} y={offsetY} scaleX={scale} scaleY={scale} listening={false}>
