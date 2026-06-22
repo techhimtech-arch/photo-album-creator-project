@@ -28,8 +28,17 @@ export default function EditorCanvas() {
   const trRef = useRef<Konva.Transformer>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [snapLines, setSnapLines] = useState<{ xLine?: number; yLine?: number; type: "h" | "v"; length: number }[]>([]);
+  const snapLinesKeyRef = useRef<string>("");
 
   useKeyboardShortcuts();
+
+  // Determine if all selected layers should keep aspect ratio (images/placeholders/decorations)
+  const keepRatio = (() => {
+    if (!page || selected.length === 0) return false;
+    const sel = page.layers.filter((l) => selected.includes(l.id));
+    if (sel.length === 0) return false;
+    return sel.every((l) => l.type === "image" || l.type === "placeholder" || l.type === "decoration");
+  })();
 
   const page: Page | undefined = album.pages.find((p) => p.id === activePageId);
 
