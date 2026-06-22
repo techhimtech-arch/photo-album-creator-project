@@ -237,16 +237,30 @@ export default function EditorCanvas() {
   );
 }
 
-function KonvaTransformerRef({ trRef }: { trRef: React.RefObject<Konva.Transformer | null> }) {
+function KonvaTransformerRef({
+  trRef,
+  keepRatio,
+}: {
+  trRef: React.RefObject<Konva.Transformer | null>;
+  keepRatio: boolean;
+}) {
   return (
     <KonvaTransformer
       ref={trRef as React.RefObject<Konva.Transformer>}
       rotateEnabled
-      keepRatio={false}
+      // Default proportional for photos/decorations; Shift toggles to free (handled by Konva: shiftBehavior).
+      keepRatio={keepRatio}
+      shiftBehavior={keepRatio ? "inverted" : "default"}
+      enabledAnchors={
+        keepRatio
+          ? ["top-left", "top-right", "bottom-left", "bottom-right"]
+          : undefined
+      }
       borderStroke="#3b82f6"
       anchorStroke="#3b82f6"
       anchorFill="#fff"
       anchorSize={8}
+      rotateAnchorOffset={24}
     />
   );
 }
