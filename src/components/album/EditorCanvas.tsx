@@ -195,7 +195,7 @@ export default function EditorCanvas() {
             listening={false}
           />
           
-          <KonvaTransformerRef trRef={trRef} />
+          <KonvaTransformerRef trRef={trRef} keepRatio={keepRatio} />
 
           {/* Snap Guides */}
           {snapLines.map((l, i) => (
