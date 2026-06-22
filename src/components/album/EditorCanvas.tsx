@@ -32,6 +32,8 @@ export default function EditorCanvas() {
 
   useKeyboardShortcuts();
 
+  const page: Page | undefined = album.pages.find((p) => p.id === activePageId);
+
   // Determine if all selected layers should keep aspect ratio (images/placeholders/decorations)
   const keepRatio = (() => {
     if (!page || selected.length === 0) return false;
@@ -39,8 +41,6 @@ export default function EditorCanvas() {
     if (sel.length === 0) return false;
     return sel.every((l) => l.type === "image" || l.type === "placeholder" || l.type === "decoration");
   })();
-
-  const page: Page | undefined = album.pages.find((p) => p.id === activePageId);
 
   const pageW = inToEditorPx(album.widthIn);
   const pageH = inToEditorPx(album.heightIn);
