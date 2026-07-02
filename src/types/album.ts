@@ -1,4 +1,4 @@
-export type AlbumSizePreset = "12x36" | "12x24" | "12x30" | "custom";
+export type AlbumSizePreset = "12x36" | "12x24" | "12x30" | "12x18" | "10x30" | "8x24" | "custom";
 
 export interface AlbumSize {
   widthIn: number;
@@ -144,10 +144,12 @@ export interface Album {
 export interface PhotoAsset {
   id: string;
   name: string;
-  src: string; // data URL
+  src: string; // Object URL or fall back to base64
   width: number;
   height: number;
   addedAt: number;
+  thumbnail?: string; // base64 compressed thumbnail for fast previewing
+  file?: Blob | File; // original binary data stored in IndexedDB
 }
 
 export interface DecorationAsset {
@@ -159,8 +161,32 @@ export interface DecorationAsset {
   addedAt: number;
 }
 
+export interface ProjectMetadata {
+  id: string;
+  name: string;
+  preset: AlbumSizePreset;
+  updatedAt: number;
+  createdAt: number;
+  thumbnail?: string; // base64 or object URL of page 1
+}
+
+export interface AlbumTheme {
+  id: string;
+  name: string;
+  description: string;
+  gap: number;
+  cornerRadius: number;
+  borderWidth: number;
+  borderColor: string;
+  backgrounds: PageBackground[];
+  fonts: string[];
+}
+
 export const ALBUM_PRESETS: Record<Exclude<AlbumSizePreset, "custom">, { widthIn: number; heightIn: number; label: string }> = {
   "12x36": { widthIn: 36, heightIn: 12, label: "12 × 36 in (spread)" },
   "12x24": { widthIn: 24, heightIn: 12, label: "12 × 24 in (spread)" },
   "12x30": { widthIn: 30, heightIn: 12, label: "12 × 30 in (spread)" },
+  "12x18": { widthIn: 18, heightIn: 12, label: "12 × 18 in (spread)" },
+  "10x30": { widthIn: 30, heightIn: 10, label: "10 × 30 in (spread)" },
+  "8x24": { widthIn: 24, heightIn: 8, label: "8 × 24 in (spread)" },
 };

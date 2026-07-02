@@ -2,6 +2,7 @@ import { useAlbumStore } from "@/lib/album-store";
 import type { WorkflowMode } from "@/lib/album-persistence";
 import { FileCode2, Palette, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ProjectDashboard from "@/components/album/ProjectDashboard";
 
 const MODES: {
   id: WorkflowMode;
@@ -40,9 +41,12 @@ export default function WorkflowNav() {
   return (
     <div className="glass-panel z-50 sticky top-0 border-b border-white/20 px-4 py-3 shadow-md transition-all">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between max-w-7xl mx-auto">
-        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 hidden lg:flex items-center gap-2 bg-white/50 dark:bg-slate-800/50 px-3 py-1.5 rounded-full border border-white/30 backdrop-blur-sm">
-          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-          Workflow: design once → reuse for every client album
+        <div className="flex items-center gap-3">
+          <ProjectDashboard />
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 hidden lg:flex items-center gap-2 bg-white/50 dark:bg-slate-800/50 px-3 py-1.5 rounded-full border border-white/30 backdrop-blur-sm">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            Workflow: design once → reuse for every client album
+          </div>
         </div>
         
         <div className="flex items-center justify-center p-1.5 rounded-xl bg-slate-200/50 dark:bg-slate-800/50 backdrop-blur-md shadow-inner border border-white/10 dark:border-black/20 w-full md:w-auto">

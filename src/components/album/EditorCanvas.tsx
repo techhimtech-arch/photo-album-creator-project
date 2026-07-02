@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Stage, Layer, Rect, Group, Line, Transformer as KonvaTransformer } from "react-konva";
+import { Stage, Layer, Rect, Group, Line, Text as KonvaText, Transformer as KonvaTransformer } from "react-konva";
 import Konva from "konva";
 import { useAlbumStore } from "@/lib/album-store";
 import { inToEditorPx } from "@/lib/units";
@@ -35,6 +35,9 @@ export default function EditorCanvas() {
 
   const pageW = inToEditorPx(album.widthIn);
   const pageH = inToEditorPx(album.heightIn);
+  
+  const pageIndex = album.pages.findIndex((p) => p.id === activePageId);
+  const pageNumberString = `— Page ${pageIndex + 1} —`;
 
   // Resize observer
   useEffect(() => {
@@ -172,6 +175,19 @@ export default function EditorCanvas() {
             height={pageH}
             stroke="rgba(0,0,0,0.15)"
             strokeWidth={1 / scale}
+            listening={false}
+          />
+          
+          {/* Page Number */}
+          <KonvaText
+            x={0}
+            y={pageH - 24}
+            width={pageW}
+            text={pageNumberString}
+            fontSize={11}
+            fontFamily="Inter"
+            fill="rgba(0,0,0,0.35)"
+            align="center"
             listening={false}
           />
           

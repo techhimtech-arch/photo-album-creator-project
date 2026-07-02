@@ -3,7 +3,7 @@ import { useAlbumStore } from "@/lib/album-store";
 import { countAlbumSlots } from "@/lib/album-template";
 import { Button } from "@/components/ui/button";
 import { Upload, FolderOpen, X, Wand2, Zap } from "lucide-react";
-import { fileToDataUrl, loadImageSize, uid } from "@/lib/utils-album";
+import { fileToDataUrl, loadImageSize, uid, createThumbnail } from "@/lib/utils-album";
 import type { ImageLayer, PhotoAsset } from "@/types/album";
 import { inToEditorPx } from "@/lib/units";
 import { toast } from "@/hooks/use-toast";
@@ -23,6 +23,8 @@ export default function PhotoGalleryPanel() {
   const autoFillAlbum = useAlbumStore((s) => s.autoFillAlbum);
   const photoSort = useAlbumStore((s) => s.photoSort);
   const setPhotoSort = useAlbumStore((s) => s.setPhotoSort);
+  const uploadProgress = useAlbumStore((s) => s.uploadProgress);
+  const setUploadProgress = useAlbumStore((s) => s.setUploadProgress);
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
 
@@ -32,30 +34,74 @@ export default function PhotoGalleryPanel() {
 
   const handleFiles = async (files: FileList | null, autoFill = false) => {
     if (!files || files.length === 0) return;
-    const imgs = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    
+    // Support standard image files and folder uploads including HEIC, PNG, JPG, WebP
+    const imgs = Array.from(files).filter((f) => {
+      const name = f.name.toLowerCase();
+      return (
+        f.type.startsWith("image/") ||
+        name.endsWith(".heic") ||
+        name.endsWith(".heif") ||
+        name.endsWith(".jpg") ||
+        name.endsWith(".jpeg") ||
+        name.endsWith(".png") ||
+        name.endsWith(".webp")
+      );
+    });
+
     if (imgs.length === 0) {
-      toast({ title: "No images found", description: "Only image files are imported." });
+      toast({ title: "No compatible images found", description: "Only JPEG, PNG, HEIC and WebP files are supported." });
       return;
     }
+
+    const existingPhotos = useAlbumStore.getState().photos;
+    setUploadProgress({ active: true, total: imgs.length, current: 0 });
+
     const results: PhotoAsset[] = [];
-    for (const f of imgs) {
+    for (let i = 0; i < imgs.length; i++) {
+      const f = imgs[i];
+      
+      // Duplicate detection by name and file size
+      const isDuplicate = existingPhotos.some(
+        (ep) => ep.name === f.name && ep.file && ep.file.size === f.size
+      );
+      if (isDuplicate) {
+        setUploadProgress({ current: i + 1 });
+        continue;
+      }
+
       try {
-        const src = await fileToDataUrl(f);
-        const { width, height } = await loadImageSize(src);
+        const objectUrl = URL.createObjectURL(f);
+        const { width, height } = await loadImageSize(objectUrl);
+        const thumbnail = await createThumbnail(f, 200);
+
         results.push({
           id: uid(),
           name: f.name,
-          src,
+          src: objectUrl,
           width,
           height,
           addedAt: Date.now(),
+          thumbnail,
+          file: f,
         });
-      } catch {
-        /* skip */
+      } catch (e) {
+        console.error("Failed to load image metadata", f.name, e);
       }
+      setUploadProgress({ current: i + 1 });
     }
-    addPhotos(results);
-    toast({ title: `${results.length} photos added` });
+
+    setUploadProgress({ active: false, total: 0, current: 0 });
+
+    if (results.length > 0) {
+      addPhotos(results);
+      toast({ 
+        title: `${results.length} photos added`, 
+        description: imgs.length - results.length > 0 ? `${imgs.length - results.length} skipped (duplicates/errors)` : undefined 
+      });
+    } else {
+      toast({ title: "No new photos added", description: "All uploaded files were duplicates." });
+    }
 
     if (autoFill && slotStats.empty > 0) {
       setTimeout(() => {
@@ -74,6 +120,24 @@ export default function PhotoGalleryPanel() {
     const page = album.pages.find((p) => p.id === activePageId);
     if (!page) return;
 
+    // Check if an image layer is selected, and REPLACE it!
+    const selectedImage = page.layers.find(
+      (l) => l.type === "image" && selectedLayerIds.includes(l.id),
+    );
+    if (selectedImage) {
+      useAlbumStore.getState().updateLayer(activePageId, selectedImage.id, {
+        src: photo.src,
+        naturalWidth: photo.width,
+        naturalHeight: photo.height,
+        name: photo.name,
+        crop: undefined, // reset crop for the new image
+      });
+      useAlbumStore.getState().setAlbum((a) => ({ ...a }), true);
+      toast({ title: "Photo replaced" });
+      return;
+    }
+
+    // Check if a placeholder is selected, and fill it
     const selectedPlaceholder = page.layers.find(
       (l) => l.type === "placeholder" && selectedLayerIds.includes(l.id),
     );
@@ -161,6 +225,16 @@ export default function PhotoGalleryPanel() {
 
   return (
     <div className="flex h-full flex-col">
+      {uploadProgress.active && (
+        <div className="border-b bg-primary/10 p-3 space-y-2">
+          <div className="flex items-center justify-between text-xs font-semibold text-primary">
+            <span>Importing & Optimizing photos…</span>
+            <span>{uploadProgress.current}/{uploadProgress.total}</span>
+          </div>
+          <Progress value={Math.round((uploadProgress.current / uploadProgress.total) * 100)} className="h-1.5" />
+        </div>
+      )}
+
       {slotStats.total > 0 && (
         <div className="border-b bg-muted/30 p-3 space-y-2">
           <div className="flex items-center justify-between text-xs">
@@ -195,10 +269,10 @@ export default function PhotoGalleryPanel() {
       )}
 
       <div className="grid grid-cols-2 gap-2 p-2">
-        <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+        <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploadProgress.active}>
           <Upload className="h-4 w-4" /> Upload
         </Button>
-        <Button size="sm" variant="outline" onClick={() => folderRef.current?.click()}>
+        <Button size="sm" variant="outline" onClick={() => folderRef.current?.click()} disabled={uploadProgress.active}>
           <FolderOpen className="h-4 w-4" /> Folder
         </Button>
         <input
@@ -280,7 +354,9 @@ export default function PhotoGalleryPanel() {
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
-          handleFiles(e.dataTransfer.files, slotStats.empty > 0);
+          if (!uploadProgress.active) {
+            handleFiles(e.dataTransfer.files, slotStats.empty > 0);
+          }
         }}
       >
         {photos.length === 0 ? (
@@ -296,9 +372,9 @@ export default function PhotoGalleryPanel() {
                 key={p.id}
                 className="group relative aspect-square overflow-hidden rounded border bg-muted cursor-pointer"
                 onClick={() => placePhotoOnPage(p)}
-                title="Click to fill next placeholder on this page"
+                title="Click to fill next placeholder or replace selected photo"
               >
-                <img src={p.src} alt={p.name} className="h-full w-full object-cover" />
+                <img src={p.thumbnail || p.src} alt={p.name} className="h-full w-full object-cover" />
                 {usedSrcs.has(p.src) && (
                   <div className="absolute inset-0 bg-white/40 flex items-center justify-center">
                     <div className="bg-green-600 text-white rounded-full p-1 shadow-sm">

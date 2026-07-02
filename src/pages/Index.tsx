@@ -6,6 +6,8 @@ import ConverterView from "@/components/workflow/ConverterView";
 import DesignerView from "@/components/workflow/DesignerView";
 import ProducerView from "@/components/workflow/ProducerView";
 import { preloadWeddingFonts } from "@/lib/fonts";
+import { inToEditorPx } from "@/lib/units";
+import type { ImageLayer } from "@/types/album";
 
 const Index = () => {
   const ready = useAlbumStore((s) => s.ready);
@@ -52,14 +54,38 @@ const Index = () => {
         let category = slots.length.toString();
         if (slots.length > 6) category = "collage";
         
-        // Import LAYOUTS dynamically or from store if available.
-        // Actually we need LAYOUTS from @/lib/layouts. Let's do it cleanly:
-        import("@/lib/layouts").then(({ LAYOUTS }) => {
+        import("@/lib/layouts").then(({ LAYOUTS, findBestLayoutForPhotos }) => {
           const ALL_LAYOUTS = [...LAYOUTS, ...s.customLayouts];
-          const validLayouts = ALL_LAYOUTS.filter((l) => l.category === category);
-          if (validLayouts.length > 0) {
-            const randomLayout = validLayouts[Math.floor(Math.random() * validLayouts.length)];
-            s.applyLayoutToPage(s.activePageId, randomLayout);
+          
+          // Get photos currently placed on the page
+          const placedPhotos = page.layers
+            .filter((l): l is ImageLayer => l.type === "image")
+            .map((l) => ({
+              id: l.id,
+              name: l.name,
+              src: l.src,
+              width: l.naturalWidth,
+              height: l.naturalHeight,
+              addedAt: 0,
+            }));
+
+          const pageWpx = inToEditorPx(s.album.widthIn);
+          const pageHpx = inToEditorPx(s.album.heightIn);
+          const pageAspect = pageWpx / pageHpx;
+
+          let bestLayout = null;
+          if (placedPhotos.length > 0) {
+            bestLayout = findBestLayoutForPhotos(placedPhotos, ALL_LAYOUTS, pageAspect);
+          }
+
+          if (bestLayout) {
+            s.applyLayoutToPage(s.activePageId, bestLayout);
+          } else {
+            const validLayouts = ALL_LAYOUTS.filter((l) => l.category === category);
+            if (validLayouts.length > 0) {
+              const randomLayout = validLayouts[Math.floor(Math.random() * validLayouts.length)];
+              s.applyLayoutToPage(s.activePageId, randomLayout);
+            }
           }
         });
       }

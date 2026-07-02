@@ -38,11 +38,23 @@ export default function TextLayerNode({ layer, pageId }: Props) {
       ref={ref}
       onClick={(e) => {
         e.cancelBubble = true;
-        setSelected([layer.id]);
+        const current = useAlbumStore.getState().selectedLayerIds;
+        if (e.evt.shiftKey) {
+          const next = current.includes(layer.id)
+            ? current.filter((id) => id !== layer.id)
+            : [...current, layer.id];
+          setSelected(next);
+        } else {
+          setSelected([layer.id]);
+        }
       }}
       onTap={(e) => {
         e.cancelBubble = true;
-        setSelected([layer.id]);
+        const current = useAlbumStore.getState().selectedLayerIds;
+        const next = current.includes(layer.id)
+          ? current.filter((id) => id !== layer.id)
+          : [...current, layer.id];
+        setSelected(next);
       }}
       onDragEnd={(e) => {
         updateLayer(pageId, layer.id, { x: e.target.x(), y: e.target.y() });

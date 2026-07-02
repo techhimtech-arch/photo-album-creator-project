@@ -30,9 +30,15 @@ import {
   saveTemplateLibrary,
   loadWorkflowMode,
   saveWorkflowMode,
+  loadProjectsList,
+  saveProjectsList,
+  loadLastProjectId,
+  saveLastProjectId,
+  deleteProject as deleteProjectFromDb,
   type WorkflowMode,
 } from "@/lib/album-persistence";
-import { LAYOUTS, type AlbumLayout } from "@/lib/layouts";
+import type { ProjectMetadata, AlbumTheme } from "@/types/album";
+import { LAYOUTS, findBestLayoutForPhotos, type AlbumLayout } from "@/lib/layouts";
 import { inToEditorPx } from "@/lib/units";
 import {
   isAlbumTemplate,
@@ -91,6 +97,10 @@ interface State {
   workflowMode: WorkflowMode;
   templateLibrary: AlbumTemplate[];
 
+  currentProjectId: string;
+  projectsList: ProjectMetadata[];
+  uploadProgress: { total: number; current: number; active: boolean };
+
   bootstrap: () => Promise<void>;
   setWorkflowMode: (mode: WorkflowMode) => void;
   addToTemplateLibrary: (template: AlbumTemplate) => void;
@@ -99,6 +109,15 @@ interface State {
   newAlbum: (preset: AlbumSizePreset, custom?: { widthIn: number; heightIn: number }) => void;
   resizeAlbum: (preset: AlbumSizePreset, custom?: { widthIn: number; heightIn: number }) => void;
   renameAlbum: (name: string) => void;
+
+  // Projects
+  selectProject: (id: string) => Promise<void>;
+  createProject: (name: string, preset: AlbumSizePreset) => Promise<string>;
+  duplicateProject: (id: string) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
+  setUploadProgress: (prog: Partial<State["uploadProgress"]>) => void;
+  applyTheme: (theme: AlbumTheme) => void;
+  swapLayers: (pageId: string, idA: string, idB: string) => void;
 
   // Pages
   addPage: () => void;
@@ -150,37 +169,52 @@ interface State {
 const HISTORY_LIMIT = 50;
 
 export const useAlbumStore = create<State>((set, get) => ({
-  ready: false,
-  album: createBlankAlbum(),
-  activePageId: "",
-  selectedLayerIds: [],
-  zoom: 1,
-  fitMode: "fit",
-  photos: [],
-  decorations: [],
-  customLayouts: [],
-  photoSort: "time",
-  showGuides: false,
-  layoutGap: 16,
-  history: [],
-  historyIndex: -1,
-  workflowMode: "producer",
-  templateLibrary: [],
+  currentProjectId: "",
+  projectsList: [],
+  uploadProgress: { total: 0, current: 0, active: false },
 
   bootstrap: async () => {
-    const [album, photos, decorations, layouts, templates, workflowMode] = await Promise.all([
-      loadAlbum(),
-      loadPhotos(),
+    const list = await loadProjectsList();
+    const lastId = await loadLastProjectId();
+    
+    let activeId = lastId && list.some(p => p.id === lastId) ? lastId : (list[0]?.id ?? "");
+    let a: Album;
+    let photos: PhotoAsset[] = [];
+
+    if (!activeId) {
+      // Create initial project if list is empty
+      a = createBlankAlbum("12x36");
+      activeId = a.id;
+      const initialMeta: ProjectMetadata = {
+        id: a.id,
+        name: a.name,
+        preset: a.preset,
+        createdAt: a.createdAt,
+        updatedAt: a.updatedAt,
+      };
+      list.push(initialMeta);
+      await saveAlbum(a.id, a);
+      await savePhotos(a.id, []);
+      await saveProjectsList(list);
+      await saveLastProjectId(a.id);
+    } else {
+      a = (await loadAlbum(activeId)) ?? createBlankAlbum("12x36");
+      photos = await loadPhotos(activeId);
+    }
+
+    const [decorations, layouts, templates, workflowMode] = await Promise.all([
       loadDecorations(),
       loadCustomLayouts(),
       loadTemplateLibrary(),
       loadWorkflowMode(),
     ]);
-    const a = album ?? createBlankAlbum();
+
     set({
+      projectsList: list,
+      currentProjectId: activeId,
       album: a,
-      activePageId: a.pages[0]?.id ?? "",
       photos,
+      activePageId: a.pages[0]?.id ?? "",
       decorations,
       customLayouts: layouts,
       templateLibrary: templates,
@@ -209,13 +243,31 @@ export const useAlbumStore = create<State>((set, get) => ({
     const prev = get().album;
     const next = { ...updater(prev), updatedAt: Date.now() };
     set({ album: next });
+    
+    // Also update project updated date in projectsList
+    const list = get().projectsList.map(p => 
+      p.id === get().currentProjectId ? { ...p, name: next.name, preset: next.preset, updatedAt: next.updatedAt } : p
+    );
+    set({ projectsList: list });
+
     if (snapshot) pushHistory(set, get, next);
   },
 
   newAlbum: (preset, custom) => {
     const a = createBlankAlbum(preset, custom);
+    const newMeta: ProjectMetadata = {
+      id: a.id,
+      name: a.name,
+      preset: a.preset,
+      createdAt: a.createdAt,
+      updatedAt: a.updatedAt,
+    };
+    const newList = [...get().projectsList, newMeta];
     set({
+      projectsList: newList,
+      currentProjectId: a.id,
       album: a,
+      photos: [],
       activePageId: a.pages[0].id,
       selectedLayerIds: [],
       history: [{ album: a }],
@@ -234,6 +286,225 @@ export const useAlbumStore = create<State>((set, get) => ({
   },
 
   renameAlbum: (name) => get().setAlbum((a) => ({ ...a, name }), false),
+
+  selectProject: async (id) => {
+    // Revoke old object URLs first
+    get().photos.forEach((p) => {
+      if (p.src && p.src.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(p.src);
+        } catch { /* ignore */ }
+      }
+    });
+
+    const a = await loadAlbum(id);
+    const photos = await loadPhotos(id);
+    if (!a) return;
+
+    set({
+      currentProjectId: id,
+      album: a,
+      photos,
+      activePageId: a.pages[0]?.id ?? "",
+      selectedLayerIds: [],
+      history: [{ album: a }],
+      historyIndex: 0,
+    });
+  },
+
+  createProject: async (name, preset) => {
+    const a = createBlankAlbum(preset);
+    a.name = name;
+    const newMeta: ProjectMetadata = {
+      id: a.id,
+      name: a.name,
+      preset: a.preset,
+      createdAt: a.createdAt,
+      updatedAt: a.updatedAt,
+    };
+    const newList = [...get().projectsList, newMeta];
+    
+    // Save directly to db
+    await saveAlbum(a.id, a);
+    await savePhotos(a.id, []);
+
+    set({
+      projectsList: newList,
+      currentProjectId: a.id,
+      album: a,
+      photos: [],
+      activePageId: a.pages[0]?.id ?? "",
+      selectedLayerIds: [],
+      history: [{ album: a }],
+      historyIndex: 0,
+    });
+
+    return a.id;
+  },
+
+  duplicateProject: async (id) => {
+    const origAlbum = await loadAlbum(id);
+    const origPhotos = await loadPhotos(id);
+    if (!origAlbum) return;
+
+    const newId = Math.random().toString(36).slice(2, 10);
+    const newAlbum: Album = {
+      ...origAlbum,
+      id: newId,
+      name: `${origAlbum.name} (Copy)`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    
+    const newPhotos = origPhotos.map((p) => {
+      const copy = { ...p, id: Math.random().toString(36).slice(2, 10), addedAt: Date.now() };
+      if (p.file) {
+        copy.file = new Blob([p.file], { type: p.file.type });
+        copy.src = URL.createObjectURL(copy.file);
+      }
+      return copy;
+    });
+
+    const newMeta: ProjectMetadata = {
+      id: newId,
+      name: newAlbum.name,
+      preset: newAlbum.preset,
+      createdAt: newAlbum.createdAt,
+      updatedAt: newAlbum.updatedAt,
+    };
+
+    await saveAlbum(newId, newAlbum);
+    await savePhotos(newId, newPhotos);
+
+    const newList = [...get().projectsList, newMeta];
+    set({ projectsList: newList });
+  },
+
+  deleteProject: async (id) => {
+    await deleteProjectFromDb(id);
+    const remaining = get().projectsList.filter((p) => p.id !== id);
+    set({ projectsList: remaining });
+
+    if (get().currentProjectId === id) {
+      if (remaining.length > 0) {
+        await get().selectProject(remaining[0].id);
+      } else {
+        await get().createProject("Untitled Album", "12x36");
+      }
+    }
+  },
+
+  setUploadProgress: (prog) => {
+    set({ uploadProgress: { ...get().uploadProgress, ...prog } });
+  },
+
+  applyTheme: (theme) => {
+    set({ layoutGap: theme.gap });
+    get().setAlbum((a) => {
+      const nextPages = a.pages.map((p) => {
+        const layers = p.layers.map((l) => {
+          if (l.type === "placeholder" || l.type === "image") {
+            return {
+              ...l,
+              cornerRadius: theme.cornerRadius,
+              border: {
+                width: theme.borderWidth,
+                color: theme.borderColor,
+              },
+            };
+          }
+          return l;
+        });
+        
+        let newBg = p.background;
+        if (theme.backgrounds && theme.backgrounds.length > 0) {
+          // Keep current background style kind if matched, else pick first
+          newBg = { ...theme.backgrounds[0] };
+        }
+
+        return {
+          ...p,
+          layers,
+          background: newBg,
+        };
+      });
+      return { ...a, pages: nextPages };
+    });
+  },
+
+  swapLayers: (pageId, idA, idB) => {
+    get().setAlbum((a) => {
+      const pageIndex = a.pages.findIndex((p) => p.id === pageId);
+      if (pageIndex === -1) return a;
+      const page = a.pages[pageIndex];
+
+      const indexA = page.layers.findIndex((l) => l.id === idA);
+      const indexB = page.layers.findIndex((l) => l.id === idB);
+      if (indexA === -1 || indexB === -1) return a;
+
+      const layerA = page.layers[indexA];
+      const layerB = page.layers[indexB];
+
+      if (
+        (layerA.type !== "image" && layerA.type !== "placeholder") ||
+        (layerB.type !== "image" && layerB.type !== "placeholder")
+      ) {
+        return a;
+      }
+
+      const nextLayers = [...page.layers];
+
+      // Keep position bounds (x, y, width, height, rotation, locked)
+      // but swap visual properties
+      const contentsA = {
+        name: layerA.name,
+        type: layerA.type,
+        src: (layerA as any).src,
+        naturalWidth: (layerA as any).naturalWidth,
+        naturalHeight: (layerA as any).naturalHeight,
+        crop: (layerA as any).crop,
+        mask: (layerA as any).mask,
+        cornerRadius: (layerA as any).cornerRadius,
+        flipH: (layerA as any).flipH,
+        flipV: (layerA as any).flipV,
+        border: (layerA as any).border,
+        shadow: (layerA as any).shadow,
+        filters: (layerA as any).filters,
+      };
+
+      const contentsB = {
+        name: layerB.name,
+        type: layerB.type,
+        src: (layerB as any).src,
+        naturalWidth: (layerB as any).naturalWidth,
+        naturalHeight: (layerB as any).naturalHeight,
+        crop: (layerB as any).crop,
+        mask: (layerB as any).mask,
+        cornerRadius: (layerB as any).cornerRadius,
+        flipH: (layerB as any).flipH,
+        flipV: (layerB as any).flipV,
+        border: (layerB as any).border,
+        shadow: (layerB as any).shadow,
+        filters: (layerB as any).filters,
+      };
+
+      nextLayers[indexA] = {
+        ...layerA,
+        ...contentsB,
+        id: layerA.id,
+      } as Layer;
+
+      nextLayers[indexB] = {
+        ...layerB,
+        ...contentsA,
+        id: layerB.id,
+      } as Layer;
+
+      const nextPages = [...a.pages];
+      nextPages[pageIndex] = { ...page, layers: nextLayers };
+      return { ...a, pages: nextPages };
+    });
+  },
 
   addPage: () => {
     const page = createBlankPage();
@@ -354,7 +625,15 @@ export const useAlbumStore = create<State>((set, get) => ({
   setFitMode: (m) => set({ fitMode: m }),
 
   addPhotos: (p) => set({ photos: [...get().photos, ...p] }),
-  removePhoto: (id) => set({ photos: get().photos.filter((p) => p.id !== id) }),
+  removePhoto: (id) => {
+    const photo = get().photos.find((p) => p.id === id);
+    if (photo && photo.src && photo.src.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(photo.src);
+      } catch { /* ignore */ }
+    }
+    set({ photos: get().photos.filter((p) => p.id !== id) });
+  },
   addDecorations: (d) => set({ decorations: [...get().decorations, ...d] }),
   removeDecoration: (id) =>
     set({ decorations: get().decorations.filter((d) => d.id !== id) }),
@@ -556,9 +835,8 @@ export const useAlbumStore = create<State>((set, get) => ({
         const chunk = photosToFill.slice(i, i + chunkSize);
         i += chunkSize;
 
-        const categoryStr = chunkSize.toString();
-        const validLayouts = ALL_LAYOUTS.filter((l) => l.category === categoryStr);
-        let layout = validLayouts[Math.floor(Math.random() * validLayouts.length)];
+        const pageAspect = pageWpx / pageHpx;
+        let layout = findBestLayoutForPhotos(chunk, ALL_LAYOUTS, pageAspect);
         if (!layout && ALL_LAYOUTS.length > 0) {
           layout = ALL_LAYOUTS[0];
         }
@@ -706,18 +984,31 @@ let lastPhotos: PhotoAsset[] | null = null;
 let lastDecor: DecorationAsset[] | null = null;
 let lastLayouts: AlbumLayout[] | null = null;
 let lastTemplateLib: AlbumTemplate[] | null = null;
+let lastProjectId: string | null = null;
+let lastProjectsList: ProjectMetadata[] | null = null;
 
 useAlbumStore.subscribe((s) => {
   if (!s.ready) return;
+  
+  if (s.currentProjectId !== lastProjectId) {
+    lastProjectId = s.currentProjectId;
+    void saveLastProjectId(s.currentProjectId);
+  }
+  
+  if (s.projectsList !== lastProjectsList) {
+    lastProjectsList = s.projectsList;
+    void saveProjectsList(s.projectsList);
+  }
+
   if (s.album !== lastAlbum) {
     lastAlbum = s.album;
     if (albumTimer) clearTimeout(albumTimer);
-    albumTimer = setTimeout(() => void saveAlbum(s.album), 500);
+    albumTimer = setTimeout(() => void saveAlbum(s.currentProjectId, s.album), 500);
   }
   if (s.photos !== lastPhotos) {
     lastPhotos = s.photos;
     if (photoTimer) clearTimeout(photoTimer);
-    photoTimer = setTimeout(() => void savePhotos(s.photos), 500);
+    photoTimer = setTimeout(() => void savePhotos(s.currentProjectId, s.photos), 500);
   }
   if (s.decorations !== lastDecor) {
     lastDecor = s.decorations;
