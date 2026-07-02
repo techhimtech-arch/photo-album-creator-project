@@ -169,6 +169,22 @@ interface State {
 const HISTORY_LIMIT = 50;
 
 export const useAlbumStore = create<State>((set, get) => ({
+  ready: false,
+  album: createBlankAlbum("12x36"),
+  activePageId: "",
+  selectedLayerIds: [],
+  zoom: 0.8,
+  fitMode: "fit",
+  photos: [],
+  decorations: [],
+  customLayouts: [],
+  photoSort: "time",
+  showGuides: true,
+  layoutGap: 16,
+  history: [],
+  historyIndex: -1,
+  workflowMode: "designer",
+  templateLibrary: [],
   currentProjectId: "",
   projectsList: [],
   uploadProgress: { total: 0, current: 0, active: false },
