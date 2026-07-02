@@ -198,7 +198,6 @@ export default function EditorCanvas() {
             listening={false}
           />
           
-<<<<<<< HEAD
           {/* Page Number */}
           <KonvaText
             x={0}
@@ -212,10 +211,7 @@ export default function EditorCanvas() {
             listening={false}
           />
           
-          <KonvaTransformerRef trRef={trRef} />
-=======
           <KonvaTransformerRef trRef={trRef} keepRatio={keepRatio} />
->>>>>>> 0b5d8b0b0be32523a447c9a5812eb6cc12ad2d3e
 
           {/* Snap Guides */}
           {snapLines.map((l, i) => (

@@ -362,6 +362,88 @@ function ImageProps({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quick Frame Presets */}
+      <div className="space-y-1.5 pt-2">
+        <Label className="text-xs font-semibold text-slate-500">Quick Frame Style Presets</Label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {[
+            {
+              name: "Classic White",
+              style: {
+                border: { width: 6, color: "#ffffff" },
+                cornerRadius: 0,
+                shadow: { blur: 12, offsetX: 4, offsetY: 4, color: "#000000", opacity: 0.2 },
+              },
+            },
+            {
+              name: "Royal Gold",
+              style: {
+                border: { width: 3, color: "#d4af37" },
+                cornerRadius: 4,
+                shadow: { blur: 8, offsetX: 0, offsetY: 3, color: "#000000", opacity: 0.2 },
+              },
+            },
+            {
+              name: "Soft Rounded",
+              style: {
+                border: { width: 0, color: "transparent" },
+                cornerRadius: 16,
+                shadow: { blur: 16, offsetX: 0, offsetY: 4, color: "#000000", opacity: 0.12 },
+              },
+            },
+            {
+              name: "Dreamy Glow",
+              style: {
+                border: { width: 0, color: "transparent" },
+                cornerRadius: 12,
+                shadow: { blur: 20, offsetX: 0, offsetY: 0, color: "#ec4899", opacity: 0.25 },
+              },
+            },
+            {
+              name: "Borderless Flat",
+              style: {
+                border: { width: 0, color: "transparent" },
+                cornerRadius: 0,
+                shadow: undefined,
+              },
+            },
+            {
+              name: "Clean Shadows",
+              style: {
+                border: { width: 0, color: "transparent" },
+                cornerRadius: 4,
+                shadow: { blur: 15, offsetX: 4, offsetY: 6, color: "#000000", opacity: 0.2 },
+              },
+            },
+          ].map((preset) => (
+            <Button
+              key={preset.name}
+              variant="outline"
+              size="sm"
+              type="button"
+              className="text-[10px] h-8 justify-start px-2 font-medium bg-white/50 dark:bg-slate-900/50"
+              onClick={() => {
+                patch(preset.style as Partial<ImageLayer>);
+                commit();
+              }}
+            >
+              <span
+                className="w-3 h-3 rounded-sm border mr-2 shrink-0"
+                style={{
+                  borderColor: preset.style.border.color !== "transparent" ? preset.style.border.color : "#ccc",
+                  borderWidth: preset.style.border.width > 0 ? "2px" : "1px",
+                  borderRadius: preset.style.cornerRadius > 8 ? "6px" : "1px",
+                  boxShadow: preset.style.shadow ? "0 1px 3px rgba(0,0,0,0.2)" : "none",
+                  backgroundColor: preset.style.border.color !== "transparent" && preset.style.border.width > 4 ? preset.style.border.color : "transparent",
+                }}
+              />
+              <span className="truncate">{preset.name}</span>
+            </Button>
+          ))}
+        </div>
+      </div>
+
       <div>
         <Label>Mask</Label>
         <Select
